@@ -236,8 +236,9 @@ class AlexNet(Model):
 
             with tf.compat.v1.Graph().as_default() as graph:
                 with tf.compat.v1.Session() as sess:
-                    self.load_model_checkpoint(sess)
-                    self._graph_def = graph.as_graph_def()
+                    with tf.device("/device:GPU:0"):
+                        self.load_model_checkpoint(sess)
+                        self._graph_def = graph.as_graph_def()
 
         return self._graph_def
 
