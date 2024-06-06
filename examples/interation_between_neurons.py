@@ -16,7 +16,7 @@ import lucid_kietzmannlab.optvis.render as render
 # ### Choose the alexnet model
 
 # %%
-model_checkpoint_dir = "/share/klab/vkapoor/"
+model_checkpoint_dir = "/share/klab/vkapoor/training_seed_05"
 model_checkpoint = "model.ckpt_epoch89"
 
 # %%
