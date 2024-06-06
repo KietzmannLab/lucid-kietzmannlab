@@ -20,7 +20,7 @@ import numpy as np
 import tensorflow as tf
 from cachetools.func import lru_cache
 
-from lucid_kietzmannlab.misc.io import load
+from lucid_kietzmannlab.misc.io import loading
 from lucid_kietzmannlab.modelzoo.vision_base import Model
 
 PATH_TEMPLATE = "gs://modelzoo/aligned-activations/{}/{}-{:05d}-of-01000.npy"
@@ -92,7 +92,7 @@ def _get_aligned_activations(layer) -> np.ndarray:
         )
         for page in range(NUMBER_OF_PAGES)
     ]
-    activations = np.vstack([load(path) for path in activation_paths])
+    activations = np.vstack([loading.load(path) for path in activation_paths])
     assert np.all(np.isfinite(activations))
     return activations
 
@@ -156,7 +156,7 @@ def get_aligned_activations(layer) -> np.ndarray:
         )
         for page in range(NUMBER_OF_PAGES)
     ]
-    activations = np.vstack([load(path) for path in activation_paths])
+    activations = np.vstack([loading.load(path) for path in activation_paths])
     assert np.all(np.isfinite(activations))
     return activations
 

@@ -16,14 +16,23 @@
 """High-level wrapper for paramaterizing images."""
 
 
+import matplotlib.pyplot as plt
 import tensorflow as tf
 
+from lucid_kietzmannlab.misc.io import showing
 from lucid_kietzmannlab.optvis.param.color import to_valid_rgb
 from lucid_kietzmannlab.optvis.param.spatial import fft_image, naive
 
 
 def image(
-    w, h=None, batch=None, sd=None, decorrelate=True, fft=True, alpha=False
+    w,
+    h=None,
+    batch=None,
+    sd=None,
+    decorrelate=True,
+    fft=True,
+    alpha=False,
+    show=False,
 ):
     h = h or w
     batch = batch or 1
@@ -35,4 +44,14 @@ def image(
     if alpha:
         a = tf.nn.sigmoid(t[..., 3:])
         return tf.concat([rgb, a], -1)
+    if show:
+        with tf.compat.v1.Session() as sess:
+            sess.run(tf.compat.v1.global_variables_initializer())
+            img_array = sess.run(rgb)
+            for img in img_array:
+                plt.figure()
+                print(img.shape)
+                showing.show(img)
+                plt.title("Generated Image")
+
     return rgb

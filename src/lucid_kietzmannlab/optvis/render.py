@@ -29,7 +29,7 @@ import logging
 import numpy as np
 import tensorflow as tf
 
-from lucid_kietzmannlab.misc.io import show
+from lucid_kietzmannlab.misc.io import showing
 from lucid_kietzmannlab.optvis import objectives, param, transform
 
 # pylint: disable=invalid-name
@@ -101,11 +101,11 @@ def render_vis(
                     images.append(vis)
                     if verbose:
                         print_objective_func(sess)
-                        show(np.hstack(vis))
+                        showing.show(np.hstack(vis))
         except KeyboardInterrupt:
             log.warn(f"Interrupted optimization at step {i+1:d}.")
             vis = t_image.eval()
-            show(np.hstack(vis))
+            showing.show(np.hstack(vis))
 
         return images
 
@@ -158,6 +158,7 @@ def make_vis_T(
 
     # pylint: disable=unused-variable
     t_image = make_t_image(param_f)
+
     objective_f = objectives.as_objective(objective_f)
     transform_f = make_transform_f(transforms)
     optimizer = make_optimizer(optimizer, [])
