@@ -1,4 +1,4 @@
-# Copyright 2018 The Lucid Authors. All Rights Reserved.
+# Copyright 2018 The lucid_kietzmannlab Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,3 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+from lucid_kietzmannlab.optvis.param.color import to_valid_rgb
+from lucid_kietzmannlab.optvis.param.images import image
+from lucid_kietzmannlab.optvis.param.lowres import lowres_tensor
+from lucid_kietzmannlab.optvis.param.spatial import (
+    fft_image,
+    laplacian_pyramid,
+    naive,
+)
+
+__all__ = [
+    "to_valid_rgb",
+    "image",
+    "lowres_tensor",
+    "fft_image",
+    "laplacian_pyramid",
+    "naive",
+]
