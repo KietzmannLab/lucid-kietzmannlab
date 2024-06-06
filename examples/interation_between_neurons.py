@@ -20,7 +20,12 @@ model_checkpoint_dir = "/share/klab/vkapoor/training_seed_05"
 model_checkpoint = "model.ckpt_epoch89"
 
 # %%
-model = models.AlexNet(model_checkpoint_dir, model_checkpoint)
+#
+
+# model = models.AlexNetEcoset(model_checkpoint_dir = model_checkpoint_dir, model_checkpoint = model_checkpoint)
+# model.load_graphdef()
+
+model = models.AlexNet()
 model.load_graphdef()
 
 # %%

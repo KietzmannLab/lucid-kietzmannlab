@@ -200,36 +200,9 @@ class AlexNet(Model):
     image_value_range = (-IMAGENET_MEAN_BGR, 255 - IMAGENET_MEAN_BGR)
     input_name = "Placeholder"
 
-    def __init__(self, model_checkpoint_dir, model_checkpoint):
-
-        self.model_checkpoint_dir = model_checkpoint_dir
-        self.model_checkpoint = model_checkpoint
-        self._graph_def = None
-
-    def load_model_checkpoint(self, sess):
-        saver = tf.compat.v1.train.import_meta_graph(
-            f"{self.model_checkpoint_dir}/{self.model_checkpoint}.meta"
-        )
-        saver.restore(
-            sess, f"{self.model_checkpoint_dir}/{self.model_checkpoint}"
-        )
-
-    @property
-    def graph_def(self):
-        if not self._graph_def:
-            # Load the model checkpoint and return the graph_def
-
-            with tf.compat.v1.Graph().as_default() as graph:
-                with tf.compat.v1.Session() as sess:
-
-                    self.load_model_checkpoint(sess)
-                    self._graph_def = graph.as_graph_def()
-
-        return self._graph_def
-
 
 AlexNet.layers = _layers_from_list_of_dicts(
-    AlexNet(None, None),
+    AlexNet(),
     [
         {"tags": ["pre_relu", "conv"], "name": "Conv2D", "depth": 96},
         {"tags": ["pre_relu", "conv"], "name": "Conv2D_1", "depth": 128},
@@ -270,25 +243,10 @@ class AlexNetEcoset(Model):
     image_value_range = (-IMAGENET_MEAN_BGR, 255 - IMAGENET_MEAN_BGR)
     input_name = "Placeholder"
 
-    model_checkpoint_path = "model.ckpt_epoch89"
-    model_checkpoint_dir = "/path/to/checkpoint/directory"
-
-    AlexNet.layers = _layers_from_list_of_dicts(
-        AlexNet(),
-        [
-            {"tags": ["pre_relu", "conv"], "name": "Conv2D", "depth": 96},
-            {"tags": ["pre_relu", "conv"], "name": "Conv2D_1", "depth": 128},
-            {"tags": ["pre_relu", "conv"], "name": "Conv2D_2", "depth": 128},
-            {"tags": ["pre_relu", "conv"], "name": "Conv2D_3", "depth": 384},
-            {"tags": ["pre_relu", "conv"], "name": "Conv2D_4", "depth": 192},
-            {"tags": ["pre_relu", "conv"], "name": "Conv2D_5", "depth": 192},
-            {"tags": ["pre_relu", "conv"], "name": "Conv2D_6", "depth": 128},
-            {"tags": ["pre_relu", "conv"], "name": "Conv2D_7", "depth": 128},
-            {"tags": ["dense"], "name": "Relu", "depth": 4096},
-            {"tags": ["dense"], "name": "Relu_1", "depth": 4096},
-            {"tags": ["dense"], "name": "Softmax", "depth": 1000},
-        ],
-    )
+    def __init__(self, model_checkpoint_path, model_checkpoint_dir):
+        self.model_checkpoint_path = model_checkpoint_path
+        self.model_checkpoint_dir = model_checkpoint_dir
+        self._graph_def = None
 
     def load_model_checkpoint(self, sess):
         saver = tf.compat.v1.train.import_meta_graph(
@@ -297,9 +255,6 @@ class AlexNetEcoset(Model):
         saver.restore(
             sess, f"{self.model_checkpoint_dir}/{self.model_checkpoint_path}"
         )
-
-    def __init__(self):
-        self._graph_def = None
 
     @property
     def graph_def(self):
@@ -313,3 +268,21 @@ class AlexNetEcoset(Model):
 
     def post_import(self, scope):
         pass
+
+
+AlexNetEcoset.layers = _layers_from_list_of_dicts(
+    AlexNetEcoset(None, None),
+    [
+        {"tags": ["pre_relu", "conv"], "name": "Conv2D", "depth": 96},
+        {"tags": ["pre_relu", "conv"], "name": "Conv2D_1", "depth": 128},
+        {"tags": ["pre_relu", "conv"], "name": "Conv2D_2", "depth": 128},
+        {"tags": ["pre_relu", "conv"], "name": "Conv2D_3", "depth": 384},
+        {"tags": ["pre_relu", "conv"], "name": "Conv2D_4", "depth": 192},
+        {"tags": ["pre_relu", "conv"], "name": "Conv2D_5", "depth": 192},
+        {"tags": ["pre_relu", "conv"], "name": "Conv2D_6", "depth": 128},
+        {"tags": ["pre_relu", "conv"], "name": "Conv2D_7", "depth": 128},
+        {"tags": ["dense"], "name": "Relu", "depth": 4096},
+        {"tags": ["dense"], "name": "Relu_1", "depth": 4096},
+        {"tags": ["dense"], "name": "Softmax", "depth": 1000},
+    ],
+)
