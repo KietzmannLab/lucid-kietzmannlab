@@ -18,12 +18,6 @@ This [KietzmannLab] package was generated with [Cookiecutter] using [@KietzmannL
 
 You can install `lucid-kietzmannlab` via [pip]:
 
-    pip install lucid-kietzmannlab
-
-
-
-To install latest development version :
-
     pip install git+https://github.com/KietzmannLab/lucid-kietzmannlab.git
 
 
