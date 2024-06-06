@@ -3,7 +3,6 @@
 [![License BSD-3](https://img.shields.io/pypi/l/lucid-kietzmannlab.svg?color=green)](https://github.com/KietzmannLab/lucid-kietzmannlab/raw/main/LICENSE)
 [![PyPI](https://img.shields.io/pypi/v/lucid-kietzmannlab.svg?color=green)](https://pypi.org/project/lucid-kietzmannlab)
 [![Python Version](https://img.shields.io/pypi/pyversions/lucid-kietzmannlab.svg?color=green)](https://python.org)
-[![tests](https://github.com/KietzmannLab/lucid-kietzmannlab/workflows/tests/badge.svg)](https://github.com/KietzmannLab/lucid-kietzmannlab/actions)
 [![codecov](https://codecov.io/gh/KietzmannLab/lucid-kietzmannlab/branch/main/graph/badge.svg)](https://codecov.io/gh/KietzmannLab/lucid-kietzmannlab)
 
 
