@@ -215,9 +215,35 @@ class AlexNet(Model):
     image_value_range = (-IMAGENET_MEAN_BGR, 255 - IMAGENET_MEAN_BGR)
     input_name = "Placeholder"
 
+    def __init__(self, model_checkpoint_dir, model_checkpoint):
+
+        self.model_checkpoint_dir = model_checkpoint_dir
+        self.model_checkpoint = model_checkpoint
+        self._graph_def = None
+
+    def load_model_checkpoint(self, sess):
+        saver = tf.compat.v1.train.import_meta_graph(
+            f"{self.model_checkpoint_dir}/{self.model_checkpoint}.meta"
+        )
+        saver.restore(
+            sess, f"{self.model_checkpoint_dir}/{self.model_checkpoint}"
+        )
+
+    @property
+    def graph_def(self):
+        if not self._graph_def:
+            # Load the model checkpoint and return the graph_def
+
+            with tf.compat.v1.Graph().as_default() as graph:
+                with tf.compat.v1.Session() as sess:
+                    self.load_model_checkpoint(sess)
+                    self._graph_def = graph.as_graph_def()
+
+        return self._graph_def
+
 
 AlexNet.layers = _layers_from_list_of_dicts(
-    AlexNet(),
+    AlexNet(None, None),
     [
         {"tags": ["pre_relu", "conv"], "name": "Conv2D", "depth": 96},
         {"tags": ["pre_relu", "conv"], "name": "Conv2D_1", "depth": 128},
