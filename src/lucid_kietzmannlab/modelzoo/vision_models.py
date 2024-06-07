@@ -14,6 +14,7 @@
 # ==============================================================================
 
 
+import os
 import types
 import warnings
 
@@ -290,10 +291,72 @@ AlexNetEcoset.layers = _layers_from_list_of_dicts(
 )
 
 
+class EcoAlexModel:
+    def __init__(self, session, graph):
+        self.session = session
+        self.graph = graph
+
+    def get_tensor(self, layer_name):
+        return self.graph.get_tensor_by_name(f"{layer_name}:0")
+
+
+def load_ecoset_model_seeds(model_checkpoint_dir, model_checkpoint):
+
+    alexnet_v2.default_image_size = 224
+    tf.compat.v1.disable_eager_execution()
+    inputs = tf.compat.v1.placeholder(tf.float32, [None, 224, 224, 3])
+    with slim.arg_scope(alexnet_v2_arg_scope()):
+        logits, activations, weights = alexnet_v2(inputs, is_training=False)
+
+    init = tf.compat.v1.global_variables_initializer()
+    sess = create_model_session(model_checkpoint_dir, model_checkpoint, init)
+    graph = tf.compat.v1.get_default_graph()
+    layer_name_list = [
+        node.name
+        for node in graph.as_graph_def().node
+        if "input" not in node.name
+    ]
+
+    # Dictionary to hold layer names and their shapes
+    layer_shape_dict = {}
+
+    # Get the shape of each tensor in the graph
+    for layer_name in layer_name_list:
+        try:
+            tensor = graph.get_tensor_by_name(f"{layer_name}:0")
+            tensor_shape = tensor.shape
+            if tensor_shape != ():
+                layer_shape_dict[layer_name] = tensor_shape
+        except KeyError:
+            layer_shape_dict[layer_name] = None
+
+    model = EcoAlexModel(sess, tf.compat.v1.get_default_graph())
+
+    return model, sess, logits, activations, weights, layer_shape_dict
+
+
+def create_model_session(model_checkpoint_dir, model_checkpoint, init):
+    sess = tf.compat.v1.Session()
+    sess.run(init)
+    load_pretrained_weights(
+        sess, os.path.join(model_checkpoint_dir, model_checkpoint)
+    )
+    return sess
+
+
+def load_pretrained_weights(session, checkpoint_path):
+    variables_to_restore = slim.get_model_variables("alexnet_v2")
+    saver = tf.compat.v1.train.Saver(variables_to_restore)
+    saver.restore(session, checkpoint_path)
+    print("Model loaded from:", checkpoint_path)
+
+
 def get_weights():
     return [
         v
-        for v in tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
+        for v in tf.compat.v1.get_collection(
+            tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES
+        )
         if v.name.endswith("weights:0")
     ]
 
@@ -306,7 +369,7 @@ def alexnet_v2(
     spatial_squeeze=True,
     scope="alexnet_v2",
     global_pool=False,
-    reuse_variables=True,
+    reuse_variables=tf.compat.v1.AUTO_REUSE,
     data_format="NHWC",
 ):
     """AlexNet version 2.
@@ -340,7 +403,10 @@ def alexnet_v2(
       end_points: a dict of tensors with intermediate activations.
     """
     act = []
-    with tf.variable_scope(
+    trunc_normal = lambda stddev: tf.compat.v1.truncated_normal_initializer(
+        0.0, stddev
+    )
+    with tf.compat.v1.variable_scope(
         scope, "alexnet_v2", [inputs], reuse=reuse_variables
     ) as sc:
         end_points_collection = sc.original_name_scope + "_end_points"
@@ -422,12 +488,6 @@ def alexnet_v2(
                     readout = net
                     end_points[sc.name + "/fc8"] = net
             return readout, act, get_weights()
-
-
-alexnet_v2.default_image_size = 224
-
-
-trunc_normal = lambda stddev: tf.truncated_normal_initializer(0.0, stddev)
 
 
 def alexnet_v2_arg_scope(weight_decay=0.0005):
