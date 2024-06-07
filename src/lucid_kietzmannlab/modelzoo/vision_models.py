@@ -252,17 +252,16 @@ def load_ecoset_model_seeds(model_checkpoint_dir, model_checkpoint):
     with slim.arg_scope(alexnet_v2_arg_scope()):
         logits, activations, weights = alexnet_v2(inputs, is_training=False)
 
-    init = tf.compat.v1.global_variables_initializer()
-    sess = create_model_session(model_checkpoint_dir, model_checkpoint, init)
+    sess = create_model_session(model_checkpoint_dir, model_checkpoint)
     graph = tf.compat.v1.get_default_graph()
     model = EcoAlexModel()
     model.graph = graph
-    layer_name_list = [
-        node.name
-        for node in model.graph.as_graph_def().node
-        if "Placeholder" not in node.name
-    ]
-
+    # layer_name_list_from_model = [
+    #    node.name
+    #    for node in model.graph.as_graph_def().node
+    #    if "Placeholder" not in node.name
+    # ]
+    layer_name_list = [layer_info["name"] for layer_info in model.layers]
     # Dictionary to hold layer names and their shapes
     layer_shape_dict = {}
 
@@ -270,7 +269,7 @@ def load_ecoset_model_seeds(model_checkpoint_dir, model_checkpoint):
     for layer_name in layer_name_list:
 
         try:
-            tensor = graph.get_tensor_by_name(f"{layer_name}:0")
+            tensor = graph.get_tensor_by_name(f"alexnet_v2/{layer_name}:0")
             tensor_shape = tensor.shape
             if tensor_shape != ():
                 if tensor_shape[0] is None:
@@ -282,7 +281,8 @@ def load_ecoset_model_seeds(model_checkpoint_dir, model_checkpoint):
     return model, graph, sess, logits, activations, weights, layer_shape_dict
 
 
-def create_model_session(model_checkpoint_dir, model_checkpoint, init):
+def create_model_session(model_checkpoint_dir, model_checkpoint):
+    init = tf.compat.v1.global_variables_initializer()
     sess = tf.compat.v1.Session()
     sess.run(init)
     load_pretrained_weights(
@@ -447,3 +447,18 @@ def alexnet_v2_arg_scope(weight_decay=0.0005):
         with slim.arg_scope([slim.conv2d], padding="SAME"):
             with slim.arg_scope([slim.max_pool2d], padding="VALID") as arg_sc:
                 return arg_sc
+
+
+EcoAlexModel.layers = _layers_from_list_of_dicts(
+    EcoAlexModel(),
+    [
+        {"tags": ["pre_relu", "conv"], "name": "conv1/Conv2D", "depth": 64},
+        {"tags": ["pre_relu", "conv"], "name": "conv2/Conv2D", "depth": 192},
+        {"tags": ["pre_relu", "conv"], "name": "conv3/Conv2D", "depth": 384},
+        {"tags": ["pre_relu", "conv"], "name": "conv4/Conv2D", "depth": 384},
+        {"tags": ["pre_relu", "conv"], "name": "conv5/Conv2D", "depth": 256},
+        {"tags": ["dense"], "name": "fc6/Conv2D", "depth": 4096},
+        {"tags": ["dense"], "name": "fc7/Conv2D", "depth": 4096},
+        {"tags": ["dense"], "name": "fc8/Conv2D", "depth": 1000},
+    ],
+)
