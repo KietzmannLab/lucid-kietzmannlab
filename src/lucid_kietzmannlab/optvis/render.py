@@ -24,6 +24,7 @@ function.
 from future.standard_library import install_aliases
 
 install_aliases()
+import difflib
 import logging
 
 import numpy as np
@@ -48,6 +49,7 @@ def render_vis(
     thresholds=(512,),
     print_objectives=None,
     verbose=True,
+    scope="import",
 ):
     """Flexible optimization-base feature vis.
 
@@ -87,7 +89,9 @@ def render_vis(
 
     with tf.Graph().as_default() as graph, tf.compat.v1.Session() as sess:
 
-        T = make_vis_T(model, objective_f, param_f, optimizer, transforms)
+        T = make_vis_T(
+            model, objective_f, param_f, optimizer, transforms, scope=scope
+        )
         print_objective_func = make_print_objective_func(print_objectives, T)
         loss, vis_op, t_image = T("loss"), T("vis_op"), T("input")
         tf.compat.v1.global_variables_initializer().run()
@@ -111,7 +115,12 @@ def render_vis(
 
 
 def make_vis_T(
-    model, objective_f, param_f=None, optimizer=None, transforms=None
+    model,
+    objective_f,
+    param_f=None,
+    optimizer=None,
+    transforms=None,
+    scope="import",
 ):
     """Even more flexible optimization-base feature vis.
 
@@ -163,7 +172,7 @@ def make_vis_T(
     transform_f = make_transform_f(transforms)
     optimizer = make_optimizer(optimizer, [])
 
-    T = import_model(model, transform_f(t_image), t_image)
+    T = import_model(model, transform_f(t_image), t_image, scope=scope)
     loss = objective_f(T)
 
     global_step = tf.Variable(0, trainable=False, name="global_step")
@@ -247,9 +256,9 @@ def make_optimizer(optimizer, args):
         )
 
 
-def import_model(model, t_image, t_image_raw):
+def import_model(model, t_image, t_image_raw, scope="import"):
 
-    model.import_graph(t_image, scope="import", forget_xy_shape=True)
+    model.import_graph(t_image, scope=scope, forget_xy_shape=True)
 
     def T(layer):
         if layer == "input":
@@ -257,6 +266,20 @@ def import_model(model, t_image, t_image_raw):
         if layer == "labels":
             return model.labels
         # return t_image.graph.get_tensor_by_name("%s" % layer)
-        return t_image.graph.get_tensor_by_name("import/%s:0" % layer)
+        if scope == "import":
+            return t_image.graph.get_tensor_by_name(f"{scope}/%s:0" % layer)
+        else:
+            strings = [op.name for op in t_image.graph.get_operations()]
+            closest_op_name = find_closest_string(strings, f"{scope}/{layer}")
+            return t_image.graph.get_tensor_by_name(f"{closest_op_name}:0")
 
     return T
+
+
+def find_closest_string(strings, target_string):
+    closest_string = difflib.get_close_matches(target_string, strings, n=1)
+
+    if closest_string:
+        return closest_string[0]
+    else:
+        return None

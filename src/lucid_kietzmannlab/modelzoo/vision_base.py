@@ -158,8 +158,8 @@ def get_activations_iter(
         "max": (lambda a, b: np.maximum(a, b), lambda a, n: a),
     }[reducer]
 
-    with tf.Graph().as_default(), tf.Session() as sess:
-        t_img = tf.placeholder("float32", [None, None, None, 3])
+    with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
+        t_img = tf.compat.v1.placeholder("float32", [None, None, None, 3])
         T = model.import_graph(t_img)
         t_layer = T(layer)
 
