@@ -243,17 +243,17 @@ class AlexNetEcoset(Model):
     image_value_range = (-IMAGENET_MEAN_BGR, 255 - IMAGENET_MEAN_BGR)
     input_name = "Placeholder"
 
-    def __init__(self, model_checkpoint_path, model_checkpoint_dir):
-        self.model_checkpoint_path = model_checkpoint_path
+    def __init__(self, model_checkpoint_dir, model_checkpoint):
+        self.model_checkpoint = model_checkpoint
         self.model_checkpoint_dir = model_checkpoint_dir
         self._graph_def = None
 
     def load_model_checkpoint(self, sess):
         saver = tf.compat.v1.train.import_meta_graph(
-            f"{self.model_checkpoint_dir}/{self.model_checkpoint_path}.meta"
+            f"{self.model_checkpoint_dir}/{self.model_checkpoint}.meta"
         )
         saver.restore(
-            sess, f"{self.model_checkpoint_dir}/{self.model_checkpoint_path}"
+            sess, f"{self.model_checkpoint_dir}/{self.model_checkpoint}"
         )
 
     @property
