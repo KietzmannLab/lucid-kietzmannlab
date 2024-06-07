@@ -256,6 +256,7 @@ def import_model(model, t_image, t_image_raw):
             return t_image_raw
         if layer == "labels":
             return model.labels
+        # return t_image.graph.get_tensor_by_name("%s" % layer)
         return t_image.graph.get_tensor_by_name("import/%s:0" % layer)
 
     return T

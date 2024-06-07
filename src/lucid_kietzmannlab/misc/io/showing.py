@@ -118,6 +118,7 @@ def show(thing, domain=(0, 1)):
             log.debug("Show is assuming rank 2 or 3 tensor to be an image.")
             image(thing, domain=domain)
         else:
+
             log.warn(
                 "Show only supports numpy arrays of rank 2-4. Using repr()."
             )

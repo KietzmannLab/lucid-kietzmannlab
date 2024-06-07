@@ -291,13 +291,76 @@ AlexNetEcoset.layers = _layers_from_list_of_dicts(
 )
 
 
-class EcoAlexModel:
-    def __init__(self, session, graph):
+class EcoAlexModel(Model):
+    dataset = "ImageNet"
+    image_shape = [227, 227, 3]
+    is_BGR = True
+    image_value_range = (-IMAGENET_MEAN_BGR, 255 - IMAGENET_MEAN_BGR)
+    input_name = "Placeholder"
+
+    def __init__(self, session, graph, model_name=None):
         self.session = session
         self.graph = graph
+        self.model_name = model_name
+
+    @property
+    def graph_def(self):
+        """Returns the serialized GraphDef representation of the TensorFlow graph."""
+        return self.graph.as_graph_def()
+
+    @property
+    def name(self):
+        if self.model_name is None:
+            return self.__class__.__name__
+        else:
+            return self.model_name
 
     def get_tensor(self, layer_name):
         return self.graph.get_tensor_by_name(f"{layer_name}:0")
+
+    def import_graph(
+        self,
+        t_input=None,
+        scope="import",
+        forget_xy_shape=True,
+        input_map=None,
+    ):
+        """Import model GraphDef into the current graph."""
+        graph = tf.compat.v1.get_default_graph()
+        assert graph.unique_name(scope, False) == scope, (
+            'Scope "%s" already exists. Provide explicit scope names when '
+            "importing multiple instances of the model."
+        ) % scope
+        t_input, t_prep_input = self.create_input(t_input, forget_xy_shape)
+        final_input_map = {self.input_name: t_prep_input}
+        if input_map is not None:
+            final_input_map.update(input_map)
+        tf.import_graph_def(self.graph_def, final_input_map, name=scope)
+        self.post_import(scope)
+
+        def T(layer):
+            if ":" in layer:
+                return graph.get_tensor_by_name(f"{scope}/{layer}")
+            else:
+                return graph.get_tensor_by_name(f"{scope}/{layer}:0")
+
+        return T
+
+    def create_input(self, t_input, forget_xy_shape):
+        # Define your input creation logic here
+        # This is just a placeholder, you should replace it with your actual logic
+        if t_input is None:
+            t_input = tf.compat.v1.placeholder(
+                tf.float32, [None, 224, 224, 3]
+            )  # Example placeholder
+        t_prep_input = (
+            t_input  # Placeholder for preprocessing input, modify as needed
+        )
+        return t_input, t_prep_input
+
+    def post_import(self, scope):
+        # Define any post-import operations here, if needed
+        pass
 
 
 def load_ecoset_model_seeds(model_checkpoint_dir, model_checkpoint):
@@ -314,7 +377,7 @@ def load_ecoset_model_seeds(model_checkpoint_dir, model_checkpoint):
     layer_name_list = [
         node.name
         for node in graph.as_graph_def().node
-        if "input" not in node.name
+        if "Placeholder" not in node.name
     ]
 
     # Dictionary to hold layer names and their shapes
@@ -322,17 +385,20 @@ def load_ecoset_model_seeds(model_checkpoint_dir, model_checkpoint):
 
     # Get the shape of each tensor in the graph
     for layer_name in layer_name_list:
+
         try:
             tensor = graph.get_tensor_by_name(f"{layer_name}:0")
             tensor_shape = tensor.shape
             if tensor_shape != ():
-                layer_shape_dict[layer_name] = tensor_shape
-        except KeyError:
-            layer_shape_dict[layer_name] = None
+                if tensor_shape[0] is None:
+                    layer_shape_dict[layer_name] = tensor_shape
+        except Exception:
+            # Tensor with the specified name doesn't exist in the graph
+            pass
 
-    model = EcoAlexModel(sess, tf.compat.v1.get_default_graph())
+    model = EcoAlexModel(sess, graph)
 
-    return model, sess, logits, activations, weights, layer_shape_dict
+    return model, graph, sess, logits, activations, weights, layer_shape_dict
 
 
 def create_model_session(model_checkpoint_dir, model_checkpoint, init):
