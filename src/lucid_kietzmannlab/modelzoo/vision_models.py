@@ -245,46 +245,34 @@ class EcoAlexModel(Model):
 
 
 def load_ecoset_model_seeds(model_checkpoint_dir, model_checkpoint):
-
     alexnet_v2.default_image_size = 224
     tf.compat.v1.disable_eager_execution()
-    inputs = tf.compat.v1.placeholder(tf.float32, [None, 224, 224, 3])
-    with slim.arg_scope(alexnet_v2_arg_scope()):
-        logits, activations, weights = alexnet_v2(inputs, is_training=False)
 
-    sess = create_model_session(model_checkpoint_dir, model_checkpoint)
-    graph = tf.compat.v1.get_default_graph()
-    model = EcoAlexModel()
-    model.graph = graph
-    # layer_name_list_from_model = [
-    #    node.name
-    #    for node in model.graph.as_graph_def().node
-    #    if "Placeholder" not in node.name
-    # ]
-    layer_name_list = [layer_info["name"] for layer_info in model.layers]
-    # Dictionary to hold layer names and their shapes
-    layer_shape_dict = {}
+    graph = tf.Graph()
+    with graph.as_default():
+        inputs = tf.compat.v1.placeholder(tf.float32, [None, 224, 224, 3])
+        with slim.arg_scope(alexnet_v2_arg_scope()):
+            logits, activations, weights = alexnet_v2(
+                inputs, is_training=False
+            )
 
-    # Get the shape of each tensor in the graph
-    for layer_name in layer_name_list:
+        sess = create_model_session(model_checkpoint_dir, model_checkpoint)
+        model = EcoAlexModel()
+        model.graph = graph
 
-        try:
-            tensor = graph.get_tensor_by_name(f"alexnet_v2/{layer_name}:0")
-            tensor_shape = tensor.shape
-            if tensor_shape != ():
-                if tensor_shape[0] is None:
-                    layer_shape_dict[layer_name] = tensor_shape
-        except Exception:
-            # Tensor with the specified name doesn't exist in the graph
-            pass
+        layer_name_list = [layer_info["name"] for layer_info in model.layers]
+        layer_shape_dict = {
+            layer_name: graph.get_tensor_by_name(layer_name + ":0").shape
+            for layer_name in layer_name_list
+        }
 
     return model, graph, sess, logits, activations, weights, layer_shape_dict
 
 
 def create_model_session(model_checkpoint_dir, model_checkpoint):
-    init = tf.compat.v1.global_variables_initializer()
+    init_op = tf.compat.v1.global_variables_initializer()
     sess = tf.compat.v1.Session()
-    sess.run(init)
+    sess.run(init_op)
     load_pretrained_weights(
         sess, os.path.join(model_checkpoint_dir, model_checkpoint)
     )
@@ -292,10 +280,13 @@ def create_model_session(model_checkpoint_dir, model_checkpoint):
 
 
 def load_pretrained_weights(session, checkpoint_path):
-    variables_to_restore = slim.get_model_variables("alexnet_v2")
-    saver = tf.compat.v1.train.Saver(variables_to_restore)
-    saver.restore(session, checkpoint_path)
-    print("Model loaded from:", checkpoint_path)
+    print(f"Loading checkpoint from {checkpoint_path}...")
+    saver = tf.compat.v1.train.Saver()  # Save and restore all variables
+    try:
+        saver.restore(session, checkpoint_path)
+        print("Model loaded from:", checkpoint_path)
+    except Exception as e:
+        print(f"Error restoring model from checkpoint: {e}")
 
 
 def get_weights():
@@ -310,8 +301,8 @@ def get_weights():
 
 def alexnet_v2(
     inputs,
-    num_classes=1000,
-    is_training=True,
+    num_classes=565,
+    is_training=False,
     dropout_keep_prob=0.5,
     spatial_squeeze=True,
     scope="alexnet_v2",
@@ -452,13 +443,33 @@ def alexnet_v2_arg_scope(weight_decay=0.0005):
 EcoAlexModel.layers = _layers_from_list_of_dicts(
     EcoAlexModel(),
     [
-        {"tags": ["pre_relu", "conv"], "name": "conv1/Conv2D", "depth": 64},
-        {"tags": ["pre_relu", "conv"], "name": "conv2/Conv2D", "depth": 192},
-        {"tags": ["pre_relu", "conv"], "name": "conv3/Conv2D", "depth": 384},
-        {"tags": ["pre_relu", "conv"], "name": "conv4/Conv2D", "depth": 384},
-        {"tags": ["pre_relu", "conv"], "name": "conv5/Conv2D", "depth": 256},
-        {"tags": ["dense"], "name": "fc6/Conv2D", "depth": 4096},
-        {"tags": ["dense"], "name": "fc7/Conv2D", "depth": 4096},
-        {"tags": ["dense"], "name": "fc8/Conv2D", "depth": 1000},
+        {
+            "tags": ["pre_relu", "conv"],
+            "name": "alexnet_v2/conv1/Conv2D",
+            "depth": 64,
+        },
+        {
+            "tags": ["pre_relu", "conv"],
+            "name": "alexnet_v2/conv2/Conv2D",
+            "depth": 192,
+        },
+        {
+            "tags": ["pre_relu", "conv"],
+            "name": "alexnet_v2/conv3/Conv2D",
+            "depth": 384,
+        },
+        {
+            "tags": ["pre_relu", "conv"],
+            "name": "alexnet_v2/conv4/Conv2D",
+            "depth": 384,
+        },
+        {
+            "tags": ["pre_relu", "conv"],
+            "name": "alexnet_v2/conv5/Conv2D",
+            "depth": 256,
+        },
+        {"tags": ["dense"], "name": "alexnet_v2/fc6/Conv2D", "depth": 4096},
+        {"tags": ["dense"], "name": "alexnet_v2/fc7/Conv2D", "depth": 4096},
+        {"tags": ["dense"], "name": "alexnet_v2/fc8/Conv2D", "depth": 1000},
     ],
 )
