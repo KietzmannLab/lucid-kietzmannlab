@@ -287,15 +287,15 @@ class EcoAlexModel(Model):
 
         return t_input, t_prep_input
 
-    def import_graph_def(self, input_map=None, scope=""):
-        tf.compat.v1.import_graph_def(
-            self.graph_def, input_map=input_map, name=scope
-        )
-
 
 def load_ecoset_model_seeds(model_checkpoint_dir, model_checkpoint):
-    graph = tf.Graph()
-    with graph.as_default():
+
+    model = EcoAlexModel()
+    layer_name_list = [layer_info["name"] for layer_info in model.layers]
+
+    with tf.Graph().as_default() as graph:
+        tf.import_graph_def(model.graph_def, name="")
+        layer_shape_dict = {}
         with tf.compat.v1.Session(graph=graph) as sess:
             # Load the model
             checkpoint_path = os.path.join(
@@ -310,14 +310,12 @@ def load_ecoset_model_seeds(model_checkpoint_dir, model_checkpoint):
             )
             saver.restore(sess, checkpoint_path)
             print("Model loaded from:", model_checkpoint_dir)
+            for layer_name in layer_name_list:
+                tensor_shape = sess.graph.get_tensor_by_name(
+                    f"{layer_name}:0"
+                ).shape
+                layer_shape_dict[layer_name] = tensor_shape
 
-            model = EcoAlexModel()
-            layer_name_list = [
-                layer_info["name"] for layer_info in model.layers
-            ]
-            layer_shape_dict = get_layer_shape_dict(
-                model, graph, layer_name_list
-            )
             for layer, shape in layer_shape_dict.items():
                 print(f"Layer: {layer}, Shape: {shape}")
     return model, graph, layer_shape_dict
