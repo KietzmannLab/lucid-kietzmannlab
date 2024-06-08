@@ -19,7 +19,6 @@ import warnings
 
 import numpy as np
 import tensorflow as tf
-import tf_slim as slim
 from cachetools.func import lru_cache
 
 from lucid_kietzmannlab.misc.io import loading
@@ -197,7 +196,7 @@ class AlexNet(Model):
     labels_path = "gs://modelzoo/labels/ImageNet_standard.txt"
     synsets_path = "gs://modelzoo/labels/ImageNet_standard_synsets.txt"
     dataset = "ImageNet"
-    image_shape = [227, 227, 3]
+    image_shape = [112, 112, 3]
     is_BGR = True
     image_value_range = (-IMAGENET_MEAN_BGR, 255 - IMAGENET_MEAN_BGR)
     input_name = "Placeholder"
@@ -223,55 +222,53 @@ AlexNet.layers = _layers_from_list_of_dicts(
 
 class EcoAlexModel(Model):
     dataset = "ImageNet"
-    image_shape = [256, 256, 3]
+    image_shape = [224, 224, 3]
     is_BGR = True
     image_value_range = (-IMAGENET_MEAN_BGR, 255 - IMAGENET_MEAN_BGR)
     input_name = "Placeholder"
-    labels_path = "gs://modelzoo/labels/ImageNet_standard.txt"
-    synsets_path = "gs://modelzoo/labels/ImageNet_standard_synsets.txt"
 
     def __init__(self, graph):
         self.graph = graph
         self.layers = [
             {
-                "tags": ["pre_relu", "conv"],
-                "name": "alexnet_v2/conv1/Conv2D",
+                "tags": ["conv"],
+                "name": "tower_0/alexnet_v2/conv1/Conv2D",
                 "depth": 64,
             },
             {
-                "tags": ["pre_relu", "conv"],
-                "name": "alexnet_v2/conv2/Conv2D",
+                "tags": ["conv"],
+                "name": "tower_0/alexnet_v2/conv2/Conv2D",
                 "depth": 192,
             },
             {
-                "tags": ["pre_relu", "conv"],
-                "name": "alexnet_v2/conv3/Conv2D",
+                "tags": ["conv"],
+                "name": "tower_0/alexnet_v2/conv3/Conv2D",
                 "depth": 384,
             },
             {
-                "tags": ["pre_relu", "conv"],
-                "name": "alexnet_v2/conv4/Conv2D",
+                "tags": ["conv"],
+                "name": "tower_0/alexnet_v2/conv4/Conv2D",
                 "depth": 384,
             },
             {
-                "tags": ["pre_relu", "conv"],
-                "name": "alexnet_v2/conv5/Conv2D",
+                "tags": ["conv"],
+                "name": "tower_0/alexnet_v2/conv5/Conv2D",
                 "depth": 256,
             },
             {
                 "tags": ["dense"],
-                "name": "alexnet_v2/fc6/Conv2D",
+                "name": "tower_0/alexnet_v2/fc6/Conv2D",
                 "depth": 4096,
             },
             {
                 "tags": ["dense"],
-                "name": "alexnet_v2/fc7/Conv2D",
+                "name": "tower_0/alexnet_v2/fc7/Conv2D",
                 "depth": 4096,
             },
             {
                 "tags": ["dense"],
-                "name": "alexnet_v2/fc8/Conv2D",
-                "depth": 1000,
+                "name": "tower_0/alexnet_v2/fc8/Conv2D",
+                "depth": 565,
             },
         ]
         self.model_name = None
@@ -280,55 +277,22 @@ class EcoAlexModel(Model):
     def graph_def(self):
         """Returns the serialized GraphDef representation of the TensorFlow graph."""
         if self.graph is not None:
+
             return self.graph.as_graph_def()
         else:
             raise ValueError("Graph is not set.")
-
-    def import_graph(
-        self,
-        t_input=None,
-        scope="alexnet_v2",
-        forget_xy_shape=True,
-        input_map=None,
-    ):
-        """Import model GraphDef into the current graph."""
-        graph = tf.compat.v1.get_default_graph()
-        assert graph.unique_name(scope, False) == scope, (
-            'Scope "%s" already exists. Provide explicit scope names when '
-            "importing multiple instances of the model."
-        ) % scope
-        t_input, t_prep_input = self.create_input(t_input, forget_xy_shape)
-        final_input_map = {self.input_name: t_prep_input}
-        if input_map is not None:
-            final_input_map.update(input_map)
-        tf.import_graph_def(self.graph_def, final_input_map, name=scope)
-        self.post_import(scope)
-
-        def T(layer):
-            if ":" in layer:
-                return graph.get_tensor_by_name(f"{scope}/{layer}")
-            else:
-                return graph.get_tensor_by_name(f"{scope}/{layer}:0")
-
-        return T
 
 
 def load_ecoset_model_seeds(model_checkpoint_dir, model_checkpoint):
 
     graph = load_graph(model_checkpoint_dir, model_checkpoint)
     with graph.as_default():
-        inputs = tf.compat.v1.placeholder(tf.float32, [None, 224, 224, 3])
         model = EcoAlexModel(graph)
-
-        with slim.arg_scope(alexnet_v2_arg_scope()):
-            logits, activations, weights = alexnet_v2(
-                inputs, is_training=False
-            )
-
         layer_name_list = [layer_info["name"] for layer_info in model.layers]
+
         layer_shape_dict = get_layer_shape_dict(model, layer_name_list)
 
-    return model, graph, logits, activations, weights, layer_shape_dict
+    return model, graph, layer_shape_dict
 
 
 def get_layer_shape_dict(model, layer_name_list):
@@ -348,9 +312,7 @@ def load_graph(model_checkpoint_dir, model_checkpoint):
         meta_path = os.path.join(
             model_checkpoint_dir, f"{model_checkpoint}.meta"
         )
-        index_path = os.path.join(
-            model_checkpoint_dir, f"{model_checkpoint}.index"
-        )
+
         saver = tf.compat.v1.train.import_meta_graph(
             meta_path, clear_devices=True
         )
@@ -359,154 +321,3 @@ def load_graph(model_checkpoint_dir, model_checkpoint):
         graph = tf.compat.v1.get_default_graph()
         print("Model loaded from:", model_checkpoint_dir)
         return graph
-
-
-def get_weights():
-    return [
-        v
-        for v in tf.compat.v1.get_collection(
-            tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES
-        )
-        if v.name.endswith("weights:0")
-    ]
-
-
-def alexnet_v2(
-    inputs,
-    num_classes=565,
-    is_training=False,
-    dropout_keep_prob=0.5,
-    spatial_squeeze=True,
-    scope="alexnet_v2",
-    global_pool=False,
-    reuse_variables=False,  # tf.compat.v1.AUTO_REUSE,
-    data_format="NHWC",
-):
-    """AlexNet version 2.
-    Described in: http://arxiv.org/pdf/1404.5997v2.pdf
-    Parameters from:
-    github.com/akrizhevsky/cuda-convnet2/blob/master/layers/
-    layers-imagenet-1gpu.cfg
-    Note: All the fully_connected layers have been transformed to conv2d layers.
-          To use in classification mode, resize input to 224x224 or set
-          global_pool=True. To use in fully convolutional mode, set
-          spatial_squeeze to false.
-          The LRN layers have been removed and change the initializers from
-          random_normal_initializer to xavier_initializer.
-    Args:
-      inputs: a tensor of size [batch_size, height, width, channels].
-      num_classes: the number of predicted classes. If 0 or None, the logits layer
-      is omitted and the input features to the logits layer are returned instead.
-      is_training: whether or not the model is being trained.
-      dropout_keep_prob: the probability that activations are kept in the dropout
-        layers during training.
-      spatial_squeeze: whether or not should squeeze the spatial dimensions of the
-        logits. Useful to remove unnecessary dimensions for classification.
-      scope: Optional scope for the variables.
-      global_pool: Optional boolean flag. If True, the input to the classification
-        layer is avgpooled to size 1x1, for any input size. (This is not part
-        of the original AlexNet.)
-    Returns:
-      net: the output of the logits layer (if num_classes is a non-zero integer),
-        or the non-dropped-out input to the logits layer (if num_classes is 0
-        or None).
-      end_points: a dict of tensors with intermediate activations.
-    """
-    act = []
-    trunc_normal = lambda stddev: tf.compat.v1.truncated_normal_initializer(
-        0.0, stddev
-    )
-    with tf.compat.v1.variable_scope(
-        scope, "alexnet_v2", [inputs], reuse=reuse_variables
-    ) as sc:
-        end_points_collection = sc.original_name_scope + "_end_points"
-        # Collect outputs for conv2d, fully_connected and max_pool2d.
-        with slim.arg_scope(
-            [slim.conv2d, slim.fully_connected, slim.max_pool2d],
-            outputs_collections=[end_points_collection],
-            data_format=data_format,
-        ):
-            net = slim.conv2d(
-                inputs, 64, [11, 11], 4, padding="VALID", scope="conv1"
-            )
-            act.append(net)
-            net = slim.max_pool2d(net, [3, 3], 2, scope="pool1")
-            net = slim.conv2d(net, 192, [5, 5], scope="conv2")
-            act.append(net)
-            net = slim.max_pool2d(net, [3, 3], 2, scope="pool2")
-            net = slim.conv2d(net, 384, [3, 3], scope="conv3")
-            act.append(net)
-            net = slim.conv2d(net, 384, [3, 3], scope="conv4")
-            act.append(net)
-            net = slim.conv2d(net, 256, [3, 3], scope="conv5")
-            act.append(net)
-            net = slim.max_pool2d(net, [3, 3], 2, scope="pool5")
-
-            # Use conv2d instead of fully_connected layers.
-            with slim.arg_scope(
-                [slim.conv2d],
-                weights_initializer=trunc_normal(0.005),
-                biases_initializer=tf.constant_initializer(0.1),
-            ):
-                net = slim.conv2d(
-                    net, 4096, [5, 5], padding="VALID", scope="fc6"
-                )
-                net = slim.dropout(
-                    net,
-                    dropout_keep_prob,
-                    is_training=is_training,
-                    scope="dropout6",
-                )
-                act.append(net)
-                net = slim.conv2d(net, 4096, [1, 1], scope="fc7")
-                act.append(net)
-                # Convert end_points_collection into a end_point dict.
-                end_points = slim.utils.convert_collection_to_dict(
-                    end_points_collection
-                )
-                if global_pool:
-                    net = tf.reduce_mean(
-                        input_tensor=net,
-                        axis=[1, 2],
-                        keepdims=True,
-                        name="global_pool",
-                    )
-                    end_points["global_pool"] = net
-                if num_classes:
-                    net = slim.dropout(
-                        net,
-                        dropout_keep_prob,
-                        is_training=is_training,
-                        scope="dropout7",
-                    )
-                    net = slim.conv2d(
-                        net,
-                        num_classes,
-                        [1, 1],
-                        activation_fn=None,
-                        normalizer_fn=None,
-                        biases_initializer=tf.zeros_initializer(),
-                        scope="fc8",
-                    )
-                    if spatial_squeeze:
-                        squeeze_dims = (
-                            [2, 3] if data_format == "NCHW" else [1, 2]
-                        )
-                        net = tf.squeeze(
-                            net, squeeze_dims, name="fc8/squeezed"
-                        )
-                    readout = net
-                    end_points[sc.name + "/fc8"] = net
-            return readout, act, get_weights()
-
-
-def alexnet_v2_arg_scope(weight_decay=0.0005):
-    with slim.arg_scope(
-        [slim.conv2d, slim.fully_connected],
-        activation_fn=tf.nn.relu,
-        biases_initializer=tf.constant_initializer(0.1),
-        weights_regularizer=slim.l2_regularizer(weight_decay),
-    ):
-        with slim.arg_scope([slim.conv2d], padding="SAME"):
-            with slim.arg_scope([slim.max_pool2d], padding="VALID") as arg_sc:
-                return arg_sc
