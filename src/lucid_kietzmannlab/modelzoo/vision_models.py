@@ -15,6 +15,7 @@
 
 
 import os
+import re
 import warnings
 
 import numpy as np
@@ -225,97 +226,116 @@ class EcoAlexModel(Model):
     image_shape = [32, 3, 224, 224]
     is_BGR = True
     image_value_range = (-IMAGENET_MEAN_BGR, 255 - IMAGENET_MEAN_BGR)
-    input_name = "Placeholder"
+    input_name = "Placeholder"  # load_data/input_images
 
-    def __init__(self):
+    def __init__(self, model_checkpoint_dir, model_checkpoint):
 
+        self.model_checkpoint_dir = model_checkpoint_dir
+        self.model_checkpoint = model_checkpoint
         self.layers = [
             {
                 "tags": ["conv"],
-                "name": "tower_0/alexnet_v2/conv1/Conv2D",
+                "scope": "conv1",
                 "depth": 64,
             },
             {
                 "tags": ["conv"],
-                "name": "tower_0/alexnet_v2/conv2/Conv2D",
+                "scope": "conv2",
                 "depth": 192,
             },
             {
                 "tags": ["conv"],
-                "name": "tower_0/alexnet_v2/conv3/Conv2D",
+                "scope": "conv3",
                 "depth": 384,
             },
             {
                 "tags": ["conv"],
-                "name": "tower_0/alexnet_v2/conv4/Conv2D",
+                "scope": "conv4",
                 "depth": 384,
             },
             {
                 "tags": ["conv"],
-                "name": "tower_0/alexnet_v2/conv5/Conv2D",
+                "scope": "conv5",
                 "depth": 256,
             },
             {
                 "tags": ["dense"],
-                "name": "tower_0/alexnet_v2/fc6/Conv2D",
+                "scope": "fc6",
                 "depth": 4096,
             },
             {
                 "tags": ["dense"],
-                "name": "tower_0/alexnet_v2/fc7/Conv2D",
+                "scope": "fc7",
                 "depth": 4096,
             },
             {
                 "tags": ["dense"],
-                "name": "tower_0/alexnet_v2/fc8/Conv2D",
+                "scope": "fc8",
                 "depth": 565,
             },
         ]
-        self.model_name = None
+        self.load_ecoset_model_seeds()
 
     @property
     def graph_def(self):
         """Returns the serialized GraphDef representation of the TensorFlow graph."""
-        return tf.compat.v1.get_default_graph().as_graph_def()
 
-    def create_input(self, t_input=None, forget_xy_shape=None):
-        """Create input tensor."""
-        t_input = tf.compat.v1.placeholder(tf.float32, self.image_shape)
-        t_prep_input = t_input
-        if len(t_prep_input.shape) == 3:
-            t_prep_input = tf.expand_dims(t_prep_input, 0)
+        return self.graph.as_graph_def()
 
-        return t_input, t_prep_input
+    def load_ecoset_model_seeds(self):
 
+        with tf.Graph().as_default() as graph:
 
-def load_ecoset_model_seeds(model_checkpoint_dir, model_checkpoint):
+            with tf.compat.v1.Session(graph=graph) as sess:
+                self.graph = sess.graph
+                tf.import_graph_def(self.graph_def, name="")
+                layer_shape_dict = {}
+                # Load the model
+                checkpoint_path = os.path.join(
+                    self.model_checkpoint_dir, self.model_checkpoint
+                )
+                meta_path = os.path.join(
+                    self.model_checkpoint_dir, f"{self.model_checkpoint}.meta"
+                )
 
-    model = EcoAlexModel()
-    layer_name_list = [layer_info["name"] for layer_info in model.layers]
+                saver = tf.compat.v1.train.import_meta_graph(
+                    meta_path, clear_devices=True
+                )
+                saver.restore(sess, checkpoint_path)
+                print("Model loaded from:", self.model_checkpoint_dir)
 
-    with tf.Graph().as_default() as graph:
-        tf.import_graph_def(model.graph_def, name="")
-        layer_shape_dict = {}
-        with tf.compat.v1.Session(graph=graph) as sess:
-            # Load the model
-            checkpoint_path = os.path.join(
-                model_checkpoint_dir, model_checkpoint
-            )
-            meta_path = os.path.join(
-                model_checkpoint_dir, f"{model_checkpoint}.meta"
-            )
+                # Find operations with no incoming edges (i.e., the inputs to the graph)
+                input_operations = [op for op in self.graph.get_operations()]
 
-            saver = tf.compat.v1.train.import_meta_graph(
-                meta_path, clear_devices=True
-            )
-            saver.restore(sess, checkpoint_path)
-            print("Model loaded from:", model_checkpoint_dir)
-            for layer_name in layer_name_list:
-                tensor_shape = sess.graph.get_tensor_by_name(
-                    f"{layer_name}:0"
-                ).shape
-                layer_shape_dict[layer_name] = tensor_shape
+                # Get the output tensor names of the input operations
+                input_tensor_names = []
+                for op in input_operations:
+                    input_tensor_names.extend(
+                        [output_tensor.name for output_tensor in op.outputs]
+                    )
 
-            for layer, shape in layer_shape_dict.items():
-                print(f"Layer: {layer}, Shape: {shape}")
-    return model, graph, layer_shape_dict
+                pattern = r"(tower_\d+/.*?/(?:conv|fc)\d*/.*?Conv2D)"
+
+                # Set to store the matching layer names
+                matching_layer_names = set()
+
+                # Traverse the graph to find operations matching the pattern
+                for op in self.graph.get_operations():
+                    match = re.search(pattern, op.name)
+                    if match:
+                        matching_layer_names.add(match.group(1))
+                matching_layer_names = {
+                    layer_name
+                    for layer_name in matching_layer_names
+                    if "gradients" not in layer_name
+                }
+
+                for tensor_name in matching_layer_names:
+                    tensor_shape = self.graph.get_tensor_by_name(
+                        f"{tensor_name}:0"
+                    )
+                    layer_shape_dict[tensor_name] = tensor_shape.shape
+
+                for layer, shape in layer_shape_dict.items():
+                    print(f"Layer: {layer}, Shape: {shape}")
+                self.layer_shape_dict = layer_shape_dict

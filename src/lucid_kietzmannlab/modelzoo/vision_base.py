@@ -369,7 +369,7 @@ class Model:
     def create_input(self, t_input=None, forget_xy_shape=True):
         """Create input tensor."""
         if t_input is None:
-            t_input = tf.placeholder(tf.float32, self.image_shape)
+            t_input = tf.compat.v1.placeholder(tf.float32, self.image_shape)
         t_prep_input = t_input
 
         if len(t_prep_input.shape) == 3:

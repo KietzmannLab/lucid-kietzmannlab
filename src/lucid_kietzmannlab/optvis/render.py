@@ -289,6 +289,7 @@ def list_all_tensors(graph):
 def find_closest_string(strings, target_string):
 
     closest_string = difflib.get_close_matches(target_string, strings, n=1)
+    print(strings)
     print(target_string, closest_string)
     if closest_string:
         return closest_string[0]
