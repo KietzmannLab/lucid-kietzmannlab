@@ -174,7 +174,6 @@ def make_vis_T(
 
     # pylint: disable=unused-variable
     t_image = make_t_image(param_f, reverse=reverse)
-    print("t_image", t_image.shape)
     objective_f = objectives.as_objective(objective_f)
     transform_f = make_transform_f(transforms)
     optimizer = make_optimizer(optimizer, [])

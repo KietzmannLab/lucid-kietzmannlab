@@ -297,7 +297,7 @@ AlexNet.layers = _layers_from_list_of_dicts(
 class EcoAlexModel(Model):
 
     def __init__(self, model_checkpoint_dir, model_checkpoint):
-        self.image_shape = [112, 112, 3]
+        self.image_shape = [3, 112, 112]
         self.dataset = "ImageNet"
 
         self.is_BGR = False
