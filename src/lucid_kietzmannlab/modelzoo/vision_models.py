@@ -319,29 +319,3 @@ def load_ecoset_model_seeds(model_checkpoint_dir, model_checkpoint):
             for layer, shape in layer_shape_dict.items():
                 print(f"Layer: {layer}, Shape: {shape}")
     return model, graph, layer_shape_dict
-
-
-def get_layer_shape_dict(model, graph, layer_name_list):
-
-    layer_shape_dict = {
-        layer_name: graph.get_tensor_by_name(layer_name + ":0").shape
-        for layer_name in layer_name_list
-    }
-
-    return layer_shape_dict
-
-
-def load_model(model_checkpoint_dir, model_checkpoint):
-    checkpoint_path = os.path.join(model_checkpoint_dir, model_checkpoint)
-    with tf.compat.v1.Session() as sess:
-        # Load the graph
-        meta_path = os.path.join(
-            model_checkpoint_dir, f"{model_checkpoint}.meta"
-        )
-
-        saver = tf.compat.v1.train.import_meta_graph(
-            meta_path, clear_devices=True
-        )
-        saver.restore(sess, checkpoint_path)
-
-        print("Model loaded from:", model_checkpoint_dir)
