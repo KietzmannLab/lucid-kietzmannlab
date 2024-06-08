@@ -18,6 +18,7 @@ import os
 import re
 import warnings
 
+import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 from cachetools.func import lru_cache
@@ -178,6 +179,54 @@ def populate_inception_bottlenecks(scope):
             _ = tf.concat(pre_relus, -1, name=concat_name)
 
 
+def plot_selected_layer_tensors(model, input_data, tensors_to_plot=[]):
+    if isinstance(model, AlexNet):
+        with tf.Graph().as_default() as graph:
+            with tf.compat.v1.Session(graph=graph) as sess:
+                model.graph = sess.graph
+                tf.import_graph_def(model.graph_def, name="")
+                layer_values_dict = {}
+
+                # Assuming input placeholder name is "input"
+
+                input_placeholder = model.graph.get_tensor_by_name(
+                    "Placeholder:0"
+                )
+
+                # Run the model to get the values of the specified tensors
+                tensor_values = sess.run(
+                    [
+                        model.graph.get_tensor_by_name(f"{tensor_name}:0")
+                        for tensor_name in tensors_to_plot
+                    ],
+                    feed_dict={input_placeholder: input_data},
+                )
+
+                for tensor_name, tensor_value in zip(
+                    tensors_to_plot, tensor_values
+                ):
+                    layer_values_dict[tensor_name] = tensor_value
+                    plot_tensor_value = tensor_value[0, :]
+                    num_channels = plot_tensor_value.shape[-1]
+                    # Calculate grid size
+                    if len(plot_tensor_value.shape) > 1:
+                        grid_size = int(np.ceil(np.sqrt(num_channels)))
+
+                        # Plot images in a grid
+                        plt.figure(figsize=(15, 15))
+                        for i in range(num_channels):
+                            plt.subplot(grid_size, grid_size, i + 1)
+                            plt.imshow(plot_tensor_value[:, :, i], cmap="gray")
+                            plt.axis("off")
+                        plt.suptitle(f"{tensor_name} - Images")
+                        plt.show()
+                    else:
+
+                        plt.plot(plot_tensor_value)
+                        plt.suptitle(f"{tensor_name}")
+                        plt.show()
+
+
 def get_layer_names_tensors(model):
 
     if isinstance(model, AlexNet):
@@ -270,7 +319,7 @@ class AlexNet(Model):
     labels_path = "gs://modelzoo/labels/ImageNet_standard.txt"
     synsets_path = "gs://modelzoo/labels/ImageNet_standard_synsets.txt"
     dataset = "ImageNet"
-    image_shape = [112, 112, 3]
+    image_shape = [227, 227, 3]
     is_BGR = True
     image_value_range = (-IMAGENET_MEAN_BGR, 255 - IMAGENET_MEAN_BGR)
     input_name = "Placeholder"
