@@ -223,70 +223,142 @@ AlexNet.layers = _layers_from_list_of_dicts(
 
 class EcoAlexModel(Model):
     dataset = "ImageNet"
-    image_shape = [227, 227, 3]
+    image_shape = [256, 256, 3]
     is_BGR = True
     image_value_range = (-IMAGENET_MEAN_BGR, 255 - IMAGENET_MEAN_BGR)
     input_name = "Placeholder"
+    labels_path = "gs://modelzoo/labels/ImageNet_standard.txt"
+    synsets_path = "gs://modelzoo/labels/ImageNet_standard_synsets.txt"
+
+    def __init__(self, graph):
+        self.graph = graph
+        self.layers = [
+            {
+                "tags": ["pre_relu", "conv"],
+                "name": "alexnet_v2/conv1/Conv2D",
+                "depth": 64,
+            },
+            {
+                "tags": ["pre_relu", "conv"],
+                "name": "alexnet_v2/conv2/Conv2D",
+                "depth": 192,
+            },
+            {
+                "tags": ["pre_relu", "conv"],
+                "name": "alexnet_v2/conv3/Conv2D",
+                "depth": 384,
+            },
+            {
+                "tags": ["pre_relu", "conv"],
+                "name": "alexnet_v2/conv4/Conv2D",
+                "depth": 384,
+            },
+            {
+                "tags": ["pre_relu", "conv"],
+                "name": "alexnet_v2/conv5/Conv2D",
+                "depth": 256,
+            },
+            {
+                "tags": ["dense"],
+                "name": "alexnet_v2/fc6/Conv2D",
+                "depth": 4096,
+            },
+            {
+                "tags": ["dense"],
+                "name": "alexnet_v2/fc7/Conv2D",
+                "depth": 4096,
+            },
+            {
+                "tags": ["dense"],
+                "name": "alexnet_v2/fc8/Conv2D",
+                "depth": 1000,
+            },
+        ]
+        self.model_name = None
 
     @property
     def graph_def(self):
         """Returns the serialized GraphDef representation of the TensorFlow graph."""
-        return self.graph.as_graph_def()
-
-    @property
-    def name(self):
-        if self.model_name is None:
-            return self.__class__.__name__
+        if self.graph is not None:
+            return self.graph.as_graph_def()
         else:
-            return self.model_name
+            raise ValueError("Graph is not set.")
 
-    def get_tensor(self, layer_name):
-        return self.graph.get_tensor_by_name(f"{layer_name}:0")
+    def import_graph(
+        self,
+        t_input=None,
+        scope="alexnet_v2",
+        forget_xy_shape=True,
+        input_map=None,
+    ):
+        """Import model GraphDef into the current graph."""
+        graph = tf.compat.v1.get_default_graph()
+        assert graph.unique_name(scope, False) == scope, (
+            'Scope "%s" already exists. Provide explicit scope names when '
+            "importing multiple instances of the model."
+        ) % scope
+        t_input, t_prep_input = self.create_input(t_input, forget_xy_shape)
+        final_input_map = {self.input_name: t_prep_input}
+        if input_map is not None:
+            final_input_map.update(input_map)
+        tf.import_graph_def(self.graph_def, final_input_map, name=scope)
+        self.post_import(scope)
+
+        def T(layer):
+            if ":" in layer:
+                return graph.get_tensor_by_name(f"{scope}/{layer}")
+            else:
+                return graph.get_tensor_by_name(f"{scope}/{layer}:0")
+
+        return T
 
 
 def load_ecoset_model_seeds(model_checkpoint_dir, model_checkpoint):
-    alexnet_v2.default_image_size = 224
-    tf.compat.v1.disable_eager_execution()
 
-    graph = tf.Graph()
+    graph = load_graph(model_checkpoint_dir, model_checkpoint)
     with graph.as_default():
         inputs = tf.compat.v1.placeholder(tf.float32, [None, 224, 224, 3])
+        model = EcoAlexModel(graph)
+
         with slim.arg_scope(alexnet_v2_arg_scope()):
             logits, activations, weights = alexnet_v2(
                 inputs, is_training=False
             )
 
-        sess = create_model_session(model_checkpoint_dir, model_checkpoint)
-        model = EcoAlexModel()
-        model.graph = graph
-
         layer_name_list = [layer_info["name"] for layer_info in model.layers]
-        layer_shape_dict = {
-            layer_name: graph.get_tensor_by_name(layer_name + ":0").shape
-            for layer_name in layer_name_list
-        }
+        layer_shape_dict = get_layer_shape_dict(model, layer_name_list)
 
-    return model, graph, sess, logits, activations, weights, layer_shape_dict
+    return model, graph, logits, activations, weights, layer_shape_dict
 
 
-def create_model_session(model_checkpoint_dir, model_checkpoint):
-    init_op = tf.compat.v1.global_variables_initializer()
-    sess = tf.compat.v1.Session()
-    sess.run(init_op)
-    load_pretrained_weights(
-        sess, os.path.join(model_checkpoint_dir, model_checkpoint)
-    )
-    return sess
+def get_layer_shape_dict(model, layer_name_list):
+
+    layer_shape_dict = {
+        layer_name: model.graph.get_tensor_by_name(layer_name + ":0").shape
+        for layer_name in layer_name_list
+    }
+
+    return layer_shape_dict
 
 
-def load_pretrained_weights(session, checkpoint_path):
-    print(f"Loading checkpoint from {checkpoint_path}...")
-    saver = tf.compat.v1.train.Saver()  # Save and restore all variables
-    try:
-        saver.restore(session, checkpoint_path)
-        print("Model loaded from:", checkpoint_path)
-    except Exception as e:
-        print(f"Error restoring model from checkpoint: {e}")
+def load_graph(model_checkpoint_dir, model_checkpoint):
+    checkpoint_path = os.path.join(model_checkpoint_dir, model_checkpoint)
+    with tf.compat.v1.Session() as sess:
+        # Load the graph
+        meta_path = os.path.join(
+            model_checkpoint_dir, f"{model_checkpoint}.meta"
+        )
+        index_path = os.path.join(
+            model_checkpoint_dir, f"{model_checkpoint}.index"
+        )
+        saver = tf.compat.v1.train.import_meta_graph(
+            meta_path, clear_devices=True
+        )
+        saver.restore(sess, checkpoint_path)
+        # Get the graph
+        graph = tf.compat.v1.get_default_graph()
+        print("Model loaded from:", model_checkpoint_dir)
+        return graph
 
 
 def get_weights():
@@ -307,7 +379,7 @@ def alexnet_v2(
     spatial_squeeze=True,
     scope="alexnet_v2",
     global_pool=False,
-    reuse_variables=tf.compat.v1.AUTO_REUSE,
+    reuse_variables=False,  # tf.compat.v1.AUTO_REUSE,
     data_format="NHWC",
 ):
     """AlexNet version 2.
@@ -438,38 +510,3 @@ def alexnet_v2_arg_scope(weight_decay=0.0005):
         with slim.arg_scope([slim.conv2d], padding="SAME"):
             with slim.arg_scope([slim.max_pool2d], padding="VALID") as arg_sc:
                 return arg_sc
-
-
-EcoAlexModel.layers = _layers_from_list_of_dicts(
-    EcoAlexModel(),
-    [
-        {
-            "tags": ["pre_relu", "conv"],
-            "name": "alexnet_v2/conv1/Conv2D",
-            "depth": 64,
-        },
-        {
-            "tags": ["pre_relu", "conv"],
-            "name": "alexnet_v2/conv2/Conv2D",
-            "depth": 192,
-        },
-        {
-            "tags": ["pre_relu", "conv"],
-            "name": "alexnet_v2/conv3/Conv2D",
-            "depth": 384,
-        },
-        {
-            "tags": ["pre_relu", "conv"],
-            "name": "alexnet_v2/conv4/Conv2D",
-            "depth": 384,
-        },
-        {
-            "tags": ["pre_relu", "conv"],
-            "name": "alexnet_v2/conv5/Conv2D",
-            "depth": 256,
-        },
-        {"tags": ["dense"], "name": "alexnet_v2/fc6/Conv2D", "depth": 4096},
-        {"tags": ["dense"], "name": "alexnet_v2/fc7/Conv2D", "depth": 4096},
-        {"tags": ["dense"], "name": "alexnet_v2/fc8/Conv2D", "depth": 1000},
-    ],
-)

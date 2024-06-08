@@ -285,6 +285,7 @@ class Model:
 
     model_path = None
     labels_path = None
+    checkpoint_path = None
     image_value_range = (-1, 1)
     image_shape = (None, None, 3)
     layers = ()
@@ -308,11 +309,17 @@ class Model:
 
     def __eq__(self, other):
         if isinstance(other, Model):
-            return self.model_path == other.model_path
+            if self.checkpoint_path is None:
+                return self.model_path == other.model_path
+            if self.checkpoint_path is not None:
+                return self.checkpoint_path == other.checkpoint_path
         return False
 
     def __hash__(self):
-        return hash(self.model_path)
+        if self.checkpoint_path is None:
+            return hash(self.model_path)
+        if self.checkpoint_path is not None:
+            return hash(self.checkpoint_path)
 
     @property
     def labels(self):
