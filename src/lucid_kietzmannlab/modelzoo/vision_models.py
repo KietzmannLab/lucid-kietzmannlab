@@ -179,52 +179,85 @@ def populate_inception_bottlenecks(scope):
             _ = tf.concat(pre_relus, -1, name=concat_name)
 
 
+def model_tensor_plot(
+    sess, model, tensors_to_plot, input_placeholder, input_data
+):
+    # Run the model to get the values of the specified tensors
+    layer_values_dict = {}
+    tensor_values = sess.run(
+        [
+            model.graph.get_tensor_by_name(f"{tensor_name}:0")
+            for tensor_name in tensors_to_plot
+        ],
+        feed_dict={input_placeholder: input_data},
+    )
+
+    for tensor_name, tensor_value in zip(tensors_to_plot, tensor_values):
+        layer_values_dict[tensor_name] = tensor_value
+        plot_tensor_value = tensor_value[0, :]
+        num_channels = plot_tensor_value.shape[-1]
+        # Calculate grid size
+        if len(plot_tensor_value.shape) > 1:
+            grid_size = int(np.ceil(np.sqrt(num_channels)))
+
+            # Plot images in a grid
+            plt.figure(figsize=(15, 15))
+            for i in range(num_channels):
+                plt.subplot(grid_size, grid_size, i + 1)
+                plt.imshow(plot_tensor_value[:, :, i], cmap="gray")
+                plt.axis("off")
+            plt.suptitle(f"{tensor_name} - Images")
+            plt.show()
+        else:
+
+            plt.plot(plot_tensor_value)
+            plt.suptitle(f"{tensor_name}")
+            plt.show()
+
+
 def plot_selected_layer_tensors(model, input_data, tensors_to_plot=[]):
     if isinstance(model, AlexNet):
         with tf.Graph().as_default() as graph:
             with tf.compat.v1.Session(graph=graph) as sess:
                 model.graph = sess.graph
                 tf.import_graph_def(model.graph_def, name="")
-                layer_values_dict = {}
 
                 # Assuming input placeholder name is "input"
 
                 input_placeholder = model.graph.get_tensor_by_name(
                     "Placeholder:0"
                 )
-
-                # Run the model to get the values of the specified tensors
-                tensor_values = sess.run(
-                    [
-                        model.graph.get_tensor_by_name(f"{tensor_name}:0")
-                        for tensor_name in tensors_to_plot
-                    ],
-                    feed_dict={input_placeholder: input_data},
+                model_tensor_plot(
+                    sess, model, tensors_to_plot, input_placeholder, input_data
                 )
 
-                for tensor_name, tensor_value in zip(
-                    tensors_to_plot, tensor_values
-                ):
-                    layer_values_dict[tensor_name] = tensor_value
-                    plot_tensor_value = tensor_value[0, :]
-                    num_channels = plot_tensor_value.shape[-1]
-                    # Calculate grid size
-                    if len(plot_tensor_value.shape) > 1:
-                        grid_size = int(np.ceil(np.sqrt(num_channels)))
+    if isinstance(model, EcoAlexModel):
 
-                        # Plot images in a grid
-                        plt.figure(figsize=(15, 15))
-                        for i in range(num_channels):
-                            plt.subplot(grid_size, grid_size, i + 1)
-                            plt.imshow(plot_tensor_value[:, :, i], cmap="gray")
-                            plt.axis("off")
-                        plt.suptitle(f"{tensor_name} - Images")
-                        plt.show()
-                    else:
+        with tf.Graph().as_default() as graph:
 
-                        plt.plot(plot_tensor_value)
-                        plt.suptitle(f"{tensor_name}")
-                        plt.show()
+            with tf.compat.v1.Session(graph=graph) as sess:
+                model.graph = sess.graph
+                tf.import_graph_def(model.graph_def, name="")
+                # Load the model
+                checkpoint_path = os.path.join(
+                    model.model_checkpoint_dir, model.model_checkpoint
+                )
+                meta_path = os.path.join(
+                    model.model_checkpoint_dir,
+                    f"{model.model_checkpoint}.meta",
+                )
+
+                saver = tf.compat.v1.train.import_meta_graph(
+                    meta_path, clear_devices=True
+                )
+                saver.restore(sess, checkpoint_path)
+
+                input_placeholder = model.graph.get_tensor_by_name(
+                    "Placeholder:0"
+                )
+                model_tensor_plot(
+                    sess, model, tensors_to_plot, input_placeholder, input_data
+                )
 
 
 def get_layer_names_tensors(model):
