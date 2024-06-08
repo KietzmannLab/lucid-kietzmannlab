@@ -482,8 +482,12 @@ class EcoAlexModel(Model):
     def load_ecoset_model_seeds(self):
 
         with tf.Graph().as_default() as graph:
+            config = tf.compat.v1.ConfigProto()
+            config.graph_options.optimizer_options.global_jit_level = (
+                tf.compat.v1.OptimizerOptions.OFF
+            )
 
-            with tf.compat.v1.Session(graph=graph) as sess:
+            with tf.compat.v1.Session(graph=graph, config=config) as sess:
                 self.graph = sess.graph
                 tf.import_graph_def(self.graph_def, name="")
                 layer_shape_dict = {}
@@ -546,7 +550,12 @@ class EcoAlexModel(Model):
 
         # Perform a forward pass through the model
         with tf.Graph().as_default() as graph:
-            with tf.compat.v1.Session(graph=graph) as sess:
+            config = tf.compat.v1.ConfigProto()
+            config.graph_options.optimizer_options.global_jit_level = (
+                tf.compat.v1.OptimizerOptions.OFF
+            )
+
+            with tf.compat.v1.Session(graph=graph, config=config) as sess:
                 # Load the model
                 tf.import_graph_def(self.graph_def, name="")
                 input_tensor = graph.get_tensor_by_name(f"{self.input_name}:0")
