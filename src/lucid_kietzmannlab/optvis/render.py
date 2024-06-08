@@ -24,7 +24,6 @@ function.
 from future.standard_library import install_aliases
 
 install_aliases()
-import difflib
 import logging
 
 import numpy as np
@@ -264,40 +263,21 @@ def make_optimizer(optimizer, args):
         )
 
 
-def import_model(model, t_image, t_image_raw, scope="import"):
+def import_model(
+    model, t_image, t_image_raw=None, scope="import", input_map=None
+):
+    if t_image_raw is None:
+        t_image_raw = t_image
 
-    model.import_graph(t_image, scope=scope, forget_xy_shape=True)
+    T_ = model.import_graph(
+        t_image, scope=scope, forget_xy_shape=True, input_map=input_map
+    )
 
     def T(layer):
         if layer == "input":
             return t_image_raw
         if layer == "labels":
             return model.labels
-        # return t_image.graph.get_tensor_by_name("%s" % layer)
-        strings = [op.name for op in t_image.graph.get_operations()]
-
-        if scope == "import":
-            return t_image.graph.get_tensor_by_name(f"{scope}/%s:0" % layer)
-        else:
-            strings = [op.name for op in t_image.graph.get_operations()]
-            closest_op_name = find_closest_string(strings, f"{layer}")
-            return t_image.graph.get_tensor_by_name(f"{closest_op_name}:0")
+        return T_(layer)
 
     return T
-
-
-def list_all_tensors(graph):
-    tensor_names = []
-    for op in graph.get_operations():
-        for tensor in op.outputs:
-            tensor_names.append(tensor.name)
-    return tensor_names
-
-
-def find_closest_string(strings, target_string):
-
-    closest_string = difflib.get_close_matches(target_string, strings, n=1)
-    if closest_string:
-        return closest_string[0]
-    else:
-        return None

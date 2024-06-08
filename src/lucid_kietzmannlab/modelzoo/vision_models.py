@@ -297,12 +297,12 @@ AlexNet.layers = _layers_from_list_of_dicts(
 class EcoAlexModel(Model):
 
     def __init__(self, model_checkpoint_dir, model_checkpoint):
-        self.image_shape = [3, 112, 112]
+        self.image_shape = [112, 112, 3]
         self.dataset = "ImageNet"
 
-        self.is_BGR = True
+        self.is_BGR = False
         self.image_value_range = (-IMAGENET_MEAN_BGR, 255 - IMAGENET_MEAN_BGR)
-        self.input_name = "Placeholder"  # load_data/input_images
+        self.input_name = "Placeholder"
         self.model_checkpoint_dir = model_checkpoint_dir
         self.model_checkpoint = model_checkpoint
 
@@ -536,3 +536,27 @@ class EcoAlexModel(Model):
                 for layer, shape in layer_shape_dict.items():
                     print(f"Layer: {layer}, Shape: {shape}")
                 self.layer_shape_dict = layer_shape_dict
+
+    def perform_forward_pass(
+        self, output_tensor_name="tower_0/alexnet_v2/fc8/Conv2D:0"
+    ):
+        # Generate a random input tensor with the correct shape
+        input_tensor_shape = [1] + self.image_shape  # Batch size of 1
+        random_input = np.random.rand(*input_tensor_shape).astype(np.float32)
+
+        # Perform a forward pass through the model
+        with tf.Graph().as_default() as graph:
+            with tf.compat.v1.Session(graph=graph) as sess:
+                # Load the model
+                tf.import_graph_def(self.graph_def, name="")
+                input_tensor = graph.get_tensor_by_name(f"{self.input_name}:0")
+                output_tensor = graph.get_tensor_by_name(
+                    output_tensor_name
+                )  # Example output tensor
+
+                # Run the session to get the output
+                output = sess.run(
+                    output_tensor, feed_dict={input_tensor: random_input}
+                )
+                print("Output shape:", output.shape)
+                print("Output values:", output)
