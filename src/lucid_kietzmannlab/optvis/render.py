@@ -267,13 +267,13 @@ def import_model(model, t_image, t_image_raw, scope="import"):
             return model.labels
         # return t_image.graph.get_tensor_by_name("%s" % layer)
         strings = [op.name for op in t_image.graph.get_operations()]
-        print(strings)
-        return t_image.graph.get_tensor_by_name(f"{scope}/%s:0" % layer)
-        # else:
-        #    strings = [op.name for op in t_image.graph.get_operations()]
-        #    closest_op_name = find_closest_string(strings, f"{scope}/{layer}")
 
-        #    return t_image.graph.get_tensor_by_name(f"{closest_op_name}:0")
+        if scope == "import":
+            return t_image.graph.get_tensor_by_name(f"{scope}/%s:0" % layer)
+        else:
+            strings = [op.name for op in t_image.graph.get_operations()]
+            closest_op_name = find_closest_string(strings, f"{layer}")
+            return t_image.graph.get_tensor_by_name(f"{closest_op_name}:0")
 
     return T
 
@@ -287,8 +287,9 @@ def list_all_tensors(graph):
 
 
 def find_closest_string(strings, target_string):
-    print(target_string, strings)
+
     closest_string = difflib.get_close_matches(target_string, strings, n=1)
+    print(target_string, closest_string)
     if closest_string:
         return closest_string[0]
     else:

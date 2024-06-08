@@ -368,11 +368,10 @@ class Model:
 
     def create_input(self, t_input=None, forget_xy_shape=True):
         """Create input tensor."""
-        print(self.image_shape, t_input)
         if t_input is None:
             t_input = tf.placeholder(tf.float32, self.image_shape)
         t_prep_input = t_input
-        print(t_input.shape)
+
         if len(t_prep_input.shape) == 3:
             t_prep_input = tf.expand_dims(t_prep_input, 0)
         if forget_xy_shape:
@@ -399,7 +398,7 @@ class Model:
         ) % scope
 
         t_input, t_prep_input = self.create_input(t_input, forget_xy_shape)
-        print(t_input.shape, t_prep_input.shape)
+
         final_input_map = {self.input_name: t_prep_input}
         if input_map is not None:
             final_input_map.update(input_map)
