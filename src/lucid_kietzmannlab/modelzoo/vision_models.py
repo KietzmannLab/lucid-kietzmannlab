@@ -178,6 +178,79 @@ def populate_inception_bottlenecks(scope):
             _ = tf.concat(pre_relus, -1, name=concat_name)
 
 
+def get_layer_names_tensors(model):
+
+    if isinstance(model, AlexNet):
+
+        with tf.Graph().as_default() as graph:
+
+            with tf.compat.v1.Session(graph=graph) as sess:
+                model.graph = sess.graph
+                tf.import_graph_def(model.graph_def, name="")
+                layer_shape_dict = {}
+                input_operations = [
+                    op.name for op in model.graph.get_operations()
+                ]
+                for tensor_name in input_operations:
+                    tensor_shape = model.graph.get_tensor_by_name(
+                        f"{tensor_name}:0"
+                    )
+                    layer_shape_dict[tensor_name] = tensor_shape
+
+    if isinstance(model, EcoAlexModel):
+
+        with tf.Graph().as_default() as graph:
+
+            with tf.compat.v1.Session(graph=graph) as sess:
+                model.graph = sess.graph
+                tf.import_graph_def(model.graph_def, name="")
+                layer_shape_dict = {}
+                # Load the model
+                checkpoint_path = os.path.join(
+                    model.model_checkpoint_dir, model.model_checkpoint
+                )
+                meta_path = os.path.join(
+                    model.model_checkpoint_dir,
+                    f"{model.model_checkpoint}.meta",
+                )
+
+                saver = tf.compat.v1.train.import_meta_graph(
+                    meta_path, clear_devices=True
+                )
+                saver.restore(sess, checkpoint_path)
+                input_operations = [op for op in model.graph.get_operations()]
+                input_tensor_names = []
+                for op in input_operations:
+                    input_tensor_names.extend(
+                        [output_tensor.name for output_tensor in op.outputs]
+                    )
+
+                pattern = r"(tower_\d+/.*?/(?:conv|fc)\d*/.*?Conv2D)"
+
+                # Set to store the matching layer names
+                matching_layer_names = set()
+
+                # Traverse the graph to find operations matching the pattern
+                for op in model.graph.get_operations():
+                    match = re.search(pattern, op.name)
+                    if match:
+                        matching_layer_names.add(match.group(1))
+                matching_layer_names = {
+                    layer_name
+                    for layer_name in matching_layer_names
+                    if "gradients" not in layer_name
+                }
+
+                for tensor_name in sorted(matching_layer_names):
+                    tensor_shape = model.graph.get_tensor_by_name(
+                        f"{tensor_name}:0"
+                    )
+                    layer_shape_dict[tensor_name] = tensor_shape
+                print("Model loaded from:", model.model_checkpoint_dir)
+
+    return layer_shape_dict
+
+
 class AlexNet(Model):
     """Original AlexNet weights ported to TF.
 
@@ -222,65 +295,189 @@ AlexNet.layers = _layers_from_list_of_dicts(
 
 
 class EcoAlexModel(Model):
-    dataset = "ImageNet"
-    image_shape = [32, 3, 224, 224]
-    is_BGR = True
-    image_value_range = (-IMAGENET_MEAN_BGR, 255 - IMAGENET_MEAN_BGR)
-    input_name = "Placeholder"  # load_data/input_images
 
     def __init__(self, model_checkpoint_dir, model_checkpoint):
+        self.image_shape = [3, 112, 112]
+        self.dataset = "ImageNet"
 
+        self.is_BGR = True
+        self.image_value_range = (-IMAGENET_MEAN_BGR, 255 - IMAGENET_MEAN_BGR)
+        self.input_name = "Placeholder"  # load_data/input_images
         self.model_checkpoint_dir = model_checkpoint_dir
         self.model_checkpoint = model_checkpoint
-        self.layers = [
-            {
-                "tags": ["conv"],
-                "scope": "conv1",
-                "depth": 64,
-            },
-            {
-                "tags": ["conv"],
-                "scope": "conv2",
-                "depth": 192,
-            },
-            {
-                "tags": ["conv"],
-                "scope": "conv3",
-                "depth": 384,
-            },
-            {
-                "tags": ["conv"],
-                "scope": "conv4",
-                "depth": 384,
-            },
-            {
-                "tags": ["conv"],
-                "scope": "conv5",
-                "depth": 256,
-            },
-            {
-                "tags": ["dense"],
-                "scope": "fc6",
-                "depth": 4096,
-            },
-            {
-                "tags": ["dense"],
-                "scope": "fc7",
-                "depth": 4096,
-            },
-            {
-                "tags": ["dense"],
-                "scope": "fc8",
-                "depth": 565,
-            },
-        ]
-        self.load_ecoset_model_seeds()
 
     @property
     def graph_def(self):
         """Returns the serialized GraphDef representation of the TensorFlow graph."""
 
         return self.graph.as_graph_def()
+
+    def load_model_layers(self):
+        self.layers = _layers_from_list_of_dicts(
+            self,
+            [
+                {
+                    "tags": ["conv"],
+                    "name": "tower_0/alexnet_v2/conv1/Conv2D",
+                    "depth": 64,
+                },
+                {
+                    "tags": ["conv"],
+                    "name": "tower_0/alexnet_v2/conv2/Conv2D",
+                    "depth": 192,
+                },
+                {
+                    "tags": ["conv"],
+                    "name": "tower_0/alexnet_v2/conv3/Conv2D",
+                    "depth": 384,
+                },
+                {
+                    "tags": ["conv"],
+                    "name": "tower_0/alexnet_v2/conv4/Conv2D",
+                    "depth": 384,
+                },
+                {
+                    "tags": ["conv"],
+                    "name": "tower_0/alexnet_v2/conv5/Conv2D",
+                    "depth": 256,
+                },
+                {
+                    "tags": ["dense"],
+                    "name": "tower_0/alexnet_v2/fc6/Conv2D",
+                    "depth": 4096,
+                },
+                {
+                    "tags": ["dense"],
+                    "name": "tower_0/alexnet_v2/fc7/Conv2D",
+                    "depth": 4096,
+                },
+                {
+                    "tags": ["dense"],
+                    "name": "tower_0/alexnet_v2/fc8/Conv2D",
+                    "depth": 565,
+                },
+                {
+                    "tags": ["conv"],
+                    "name": "tower_1/alexnet_v2/conv1/Conv2D",
+                    "depth": 64,
+                },
+                {
+                    "tags": ["conv"],
+                    "name": "tower_1/alexnet_v2/conv2/Conv2D",
+                    "depth": 192,
+                },
+                {
+                    "tags": ["conv"],
+                    "name": "tower_1/alexnet_v2/conv3/Conv2D",
+                    "depth": 384,
+                },
+                {
+                    "tags": ["conv"],
+                    "name": "tower_1/alexnet_v2/conv4/Conv2D",
+                    "depth": 384,
+                },
+                {
+                    "tags": ["conv"],
+                    "name": "tower_1/alexnet_v2/conv5/Conv2D",
+                    "depth": 256,
+                },
+                {
+                    "tags": ["dense"],
+                    "name": "tower_1/alexnet_v2/fc6/Conv2D",
+                    "depth": 4096,
+                },
+                {
+                    "tags": ["dense"],
+                    "name": "tower_1/alexnet_v2/fc7/Conv2D",
+                    "depth": 4096,
+                },
+                {
+                    "tags": ["dense"],
+                    "name": "tower_1/alexnet_v2/fc8/Conv2D",
+                    "depth": 565,
+                },
+                {
+                    "tags": ["conv"],
+                    "name": "tower_2/alexnet_v2/conv1/Conv2D",
+                    "depth": 64,
+                },
+                {
+                    "tags": ["conv"],
+                    "name": "tower_2/alexnet_v2/conv2/Conv2D",
+                    "depth": 192,
+                },
+                {
+                    "tags": ["conv"],
+                    "name": "tower_2/alexnet_v2/conv3/Conv2D",
+                    "depth": 384,
+                },
+                {
+                    "tags": ["conv"],
+                    "name": "tower_2/alexnet_v2/conv4/Conv2D",
+                    "depth": 384,
+                },
+                {
+                    "tags": ["conv"],
+                    "name": "tower_2/alexnet_v2/conv5/Conv2D",
+                    "depth": 256,
+                },
+                {
+                    "tags": ["dense"],
+                    "name": "tower_2/alexnet_v2/fc6/Conv2D",
+                    "depth": 4096,
+                },
+                {
+                    "tags": ["dense"],
+                    "name": "tower_2/alexnet_v2/fc7/Conv2D",
+                    "depth": 4096,
+                },
+                {
+                    "tags": ["dense"],
+                    "name": "tower_2/alexnet_v2/fc8/Conv2D",
+                    "depth": 565,
+                },
+                {
+                    "tags": ["conv"],
+                    "name": "tower_3/alexnet_v2/conv1/Conv2D",
+                    "depth": 64,
+                },
+                {
+                    "tags": ["conv"],
+                    "name": "tower_3/alexnet_v2/conv2/Conv2D",
+                    "depth": 192,
+                },
+                {
+                    "tags": ["conv"],
+                    "name": "tower_3/alexnet_v2/conv3/Conv2D",
+                    "depth": 384,
+                },
+                {
+                    "tags": ["conv"],
+                    "name": "tower_3/alexnet_v2/conv4/Conv2D",
+                    "depth": 384,
+                },
+                {
+                    "tags": ["conv"],
+                    "name": "tower_3/alexnet_v2/conv5/Conv2D",
+                    "depth": 256,
+                },
+                {
+                    "tags": ["dense"],
+                    "name": "tower_3/alexnet_v2/fc6/Conv2D",
+                    "depth": 4096,
+                },
+                {
+                    "tags": ["dense"],
+                    "name": "tower_3/alexnet_v2/fc7/Conv2D",
+                    "depth": 4096,
+                },
+                {
+                    "tags": ["dense"],
+                    "name": "tower_3/alexnet_v2/fc8/Conv2D",
+                    "depth": 565,
+                },
+            ],
+        )
 
     def load_ecoset_model_seeds(self):
 

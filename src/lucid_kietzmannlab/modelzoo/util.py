@@ -83,7 +83,7 @@ def frozen_default_graph_def(input_node_names, output_node_names):
     sess = tf.get_default_session()
     if sess is None:
         raise RuntimeError("Default session not registered.")
-
+    print(input_node_names, output_node_names)
     input_graph_def = tf.get_default_graph().as_graph_def()
     if len(input_graph_def.node) == 0:
         raise RuntimeError(

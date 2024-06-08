@@ -33,14 +33,20 @@ def image(
     fft=True,
     alpha=False,
     show=False,
+    reverse=False,
 ):
     h = h or w
     batch = batch or 1
     channels = 4 if alpha else 3
     shape = [batch, w, h, channels]
+    if reverse:
+        shape = [batch, channels, w, h]
     param_f = fft_image if fft else naive
     t = param_f(shape, sd=sd)
-    rgb = to_valid_rgb(t[..., :3], decorrelate=decorrelate, sigmoid=True)
+    if not reverse:
+        rgb = to_valid_rgb(t[..., :3], decorrelate=decorrelate, sigmoid=True)
+    else:
+        rgb = t
     if alpha:
         a = tf.nn.sigmoid(t[..., 3:])
         return tf.concat([rgb, a], -1)

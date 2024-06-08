@@ -122,6 +122,7 @@ def get_activations_iter(
     dtype=None,
     ind_shape=None,
     center_only=False,
+    reverse=False,
 ):
     """Collect center activtions of a layer over many images from an iterable obj.
 
@@ -157,9 +158,11 @@ def get_activations_iter(
         "rms": (lambda a, b: a + b**2, lambda a, n: np.sqrt(a / n)),
         "max": (lambda a, b: np.maximum(a, b), lambda a, n: a),
     }[reducer]
-
+    shape = [None, None, None, 3]
+    if reverse:
+        shape = [None, 3, None, None]
     with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
-        t_img = tf.compat.v1.placeholder("float32", [None, None, None, 3])
+        t_img = tf.compat.v1.placeholder("float32", shape)
         T = model.import_graph(t_img)
         t_layer = T(layer)
 
@@ -367,6 +370,7 @@ class Model:
         )
 
     def create_input(self, t_input=None, forget_xy_shape=True):
+        print(t_input.shape, self.image_shape)
         """Create input tensor."""
         if t_input is None:
             t_input = tf.compat.v1.placeholder(tf.float32, self.image_shape)
@@ -378,8 +382,7 @@ class Model:
             t_prep_input = forget_xy(t_prep_input)
         if hasattr(self, "is_BGR") and self.is_BGR is True:
             t_prep_input = tf.reverse(t_prep_input, [-1])
-        lo, hi = self.image_value_range
-        t_prep_input = lo + t_prep_input * (hi - lo)
+
         return t_input, t_prep_input
 
     def import_graph(
@@ -402,7 +405,7 @@ class Model:
         final_input_map = {self.input_name: t_prep_input}
         if input_map is not None:
             final_input_map.update(input_map)
-
+        print(final_input_map)
         tf.compat.v1.import_graph_def(
             self.graph_def, final_input_map, name=scope
         )

@@ -50,6 +50,7 @@ def render_vis(
     print_objectives=None,
     verbose=True,
     scope="import",
+    reverse=False,
 ):
     """Flexible optimization-base feature vis.
 
@@ -90,7 +91,13 @@ def render_vis(
     with tf.Graph().as_default() as graph, tf.compat.v1.Session() as sess:
 
         T = make_vis_T(
-            model, objective_f, param_f, optimizer, transforms, scope=scope
+            model,
+            objective_f,
+            param_f,
+            optimizer,
+            transforms,
+            scope=scope,
+            reverse=reverse,
         )
         print_objective_func = make_print_objective_func(print_objectives, T)
         loss, vis_op, t_image = T("loss"), T("vis_op"), T("input")
@@ -121,6 +128,7 @@ def make_vis_T(
     optimizer=None,
     transforms=None,
     scope="import",
+    reverse=False,
 ):
     """Even more flexible optimization-base feature vis.
 
@@ -166,8 +174,8 @@ def make_vis_T(
     """
 
     # pylint: disable=unused-variable
-    t_image = make_t_image(param_f)
-
+    t_image = make_t_image(param_f, reverse=reverse)
+    print("t_image", t_image.shape)
     objective_f = objectives.as_objective(objective_f)
     transform_f = make_transform_f(transforms)
     optimizer = make_optimizer(optimizer, [])
@@ -208,9 +216,9 @@ def make_print_objective_func(print_objectives, T):
 # pylint: enable=invalid-name
 
 
-def make_t_image(param_f):
+def make_t_image(param_f, reverse=False):
     if param_f is None:
-        t_image = param.image(128)
+        t_image = param.image(128, reverse=reverse)
     elif callable(param_f):
         t_image = param_f()
     elif isinstance(param_f, tf.Tensor):
@@ -289,8 +297,6 @@ def list_all_tensors(graph):
 def find_closest_string(strings, target_string):
 
     closest_string = difflib.get_close_matches(target_string, strings, n=1)
-    print(strings)
-    print(target_string, closest_string)
     if closest_string:
         return closest_string[0]
     else:
