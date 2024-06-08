@@ -222,7 +222,7 @@ AlexNet.layers = _layers_from_list_of_dicts(
 
 class EcoAlexModel(Model):
     dataset = "ImageNet"
-    image_shape = [224, 224, 3]
+    image_shape = [3, 224, 224]
     is_BGR = True
     image_value_range = (-IMAGENET_MEAN_BGR, 255 - IMAGENET_MEAN_BGR)
     input_name = "Placeholder"
@@ -277,10 +277,16 @@ class EcoAlexModel(Model):
     def graph_def(self):
         """Returns the serialized GraphDef representation of the TensorFlow graph."""
         if self.graph is not None:
-
             return self.graph.as_graph_def()
         else:
             raise ValueError("Graph is not set.")
+
+    def create_input(self, t_input=None, forget_xy_shape=True):
+        """Create input tensor."""
+        t_input = tf.compat.v1.placeholder(tf.float32, self.image_shape)
+        t_prep_input = t_input
+
+        return t_prep_input, t_input
 
 
 def load_ecoset_model_seeds(model_checkpoint_dir, model_checkpoint):
@@ -319,5 +325,6 @@ def load_graph(model_checkpoint_dir, model_checkpoint):
         saver.restore(sess, checkpoint_path)
         # Get the graph
         graph = tf.compat.v1.get_default_graph()
+
         print("Model loaded from:", model_checkpoint_dir)
         return graph

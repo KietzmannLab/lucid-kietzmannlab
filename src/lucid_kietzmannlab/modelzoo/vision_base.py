@@ -366,14 +366,13 @@ class Model:
             DeprecationWarning,
         )
 
-    def post_import(self, scope):
-        pass
-
     def create_input(self, t_input=None, forget_xy_shape=True):
         """Create input tensor."""
+        print(self.image_shape, t_input)
         if t_input is None:
             t_input = tf.placeholder(tf.float32, self.image_shape)
         t_prep_input = t_input
+        print(t_input.shape)
         if len(t_prep_input.shape) == 3:
             t_prep_input = tf.expand_dims(t_prep_input, 0)
         if forget_xy_shape:
@@ -391,6 +390,7 @@ class Model:
         forget_xy_shape=True,
         input_map=None,
     ):
+        # print(scope)
         """Import model GraphDef into the current graph."""
         graph = tf.compat.v1.get_default_graph()
         assert graph.unique_name(scope, False) == scope, (
@@ -398,11 +398,13 @@ class Model:
             "importing multiple instances of the model."
         ) % scope
         t_input, t_prep_input = self.create_input(t_input, forget_xy_shape)
+        print(t_input.shape, t_prep_input.shape)
         final_input_map = {self.input_name: t_prep_input}
         if input_map is not None:
             final_input_map.update(input_map)
-        tf.import_graph_def(self.graph_def, final_input_map, name=scope)
-        self.post_import(scope)
+        tf.compat.v1.import_graph_def(
+            self.graph_def, final_input_map, name=scope
+        )
 
         def T(layer):
             if ":" in layer:
