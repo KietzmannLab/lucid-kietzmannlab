@@ -222,7 +222,7 @@ AlexNet.layers = _layers_from_list_of_dicts(
 
 class EcoAlexModel(Model):
     dataset = "ImageNet"
-    image_shape = [3, 224, 224]
+    image_shape = [32, None, 1, 1]
     is_BGR = True
     image_value_range = (-IMAGENET_MEAN_BGR, 255 - IMAGENET_MEAN_BGR)
     input_name = "Placeholder"
@@ -281,22 +281,41 @@ class EcoAlexModel(Model):
         else:
             raise ValueError("Graph is not set.")
 
-    def create_input(self, t_input=None, forget_xy_shape=True):
+    def create_input(self, t_input=None, forget_xy_shape=None):
         """Create input tensor."""
         t_input = tf.compat.v1.placeholder(tf.float32, self.image_shape)
         t_prep_input = t_input
+        if len(t_prep_input.shape) == 3:
+            t_prep_input = tf.expand_dims(t_prep_input, 0)
 
-        return t_prep_input, t_input
+        return t_input, t_prep_input
+
+    def import_graph_def(self, input_map=None, scope=""):
+        with self.graph.as_default():
+            tf.compat.v1.import_graph_def(
+                self.graph_def, input_map=input_map, name=scope
+            )
 
 
 def load_ecoset_model_seeds(model_checkpoint_dir, model_checkpoint):
 
-    graph = load_graph(model_checkpoint_dir, model_checkpoint)
-    with graph.as_default():
+    load_model(model_checkpoint_dir, model_checkpoint)
+    graph = tf.compat.v1.get_default_graph()
+    with graph:
         model = EcoAlexModel(graph)
         layer_name_list = [layer_info["name"] for layer_info in model.layers]
 
         layer_shape_dict = get_layer_shape_dict(model, layer_name_list)
+        for layer, shape in layer_shape_dict.items():
+            print(f"Layer: {layer}, Shape: {shape}")
+
+        t_input, t_prep_input = model.create_input()
+        print(t_input.shape, t_prep_input.shape)
+        final_input_map = {model.input_name: t_prep_input}
+
+        tf.compat.v1.import_graph_def(
+            model.graph_def, final_input_map, name="tower_0/alexnet_v2"
+        )
 
     return model, graph, layer_shape_dict
 
@@ -311,7 +330,7 @@ def get_layer_shape_dict(model, layer_name_list):
     return layer_shape_dict
 
 
-def load_graph(model_checkpoint_dir, model_checkpoint):
+def load_model(model_checkpoint_dir, model_checkpoint):
     checkpoint_path = os.path.join(model_checkpoint_dir, model_checkpoint)
     with tf.compat.v1.Session() as sess:
         # Load the graph
@@ -323,8 +342,5 @@ def load_graph(model_checkpoint_dir, model_checkpoint):
             meta_path, clear_devices=True
         )
         saver.restore(sess, checkpoint_path)
-        # Get the graph
-        graph = tf.compat.v1.get_default_graph()
 
         print("Model loaded from:", model_checkpoint_dir)
-        return graph

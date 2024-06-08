@@ -397,11 +397,13 @@ class Model:
             'Scope "%s" already exists. Provide explicit scope names when '
             "importing multiple instances of the model."
         ) % scope
+
         t_input, t_prep_input = self.create_input(t_input, forget_xy_shape)
         print(t_input.shape, t_prep_input.shape)
         final_input_map = {self.input_name: t_prep_input}
         if input_map is not None:
             final_input_map.update(input_map)
+
         tf.compat.v1.import_graph_def(
             self.graph_def, final_input_map, name=scope
         )
