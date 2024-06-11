@@ -14,6 +14,7 @@
 # ==============================================================================
 
 
+import os
 import warnings
 
 import matplotlib.pyplot as plt
@@ -231,24 +232,31 @@ def plot_selected_layer_tensors(model, input_data, tensors_to_plot=[]):
                 )
 
 
-def get_layer_names_tensors(model):
+def _get_layer_names_tensors(model):
 
-    if isinstance(model, AlexNet):
+    layer_name_list = [layer_info["name"] for layer_info in model.layers]
+    # Get the shape of each layer
+    with tf.Graph().as_default() as graph:
+        # Import the model
+        tf.import_graph_def(model.graph_def, name="")
 
-        with tf.Graph().as_default() as graph:
+        # Get the shape of each tensor
+        layer_shape_dict = {}
+        with tf.compat.v1.Session() as sess:
+            for layer_name in layer_name_list:
+                try:
+                    tensor_shape = sess.graph.get_tensor_by_name(
+                        f"{layer_name}:0"
+                    ).shape
 
-            with tf.compat.v1.Session(graph=graph) as sess:
-                model.graph = sess.graph
-                tf.import_graph_def(model.graph_def, name="")
-                layer_shape_dict = {}
-                input_operations = [
-                    op.name for op in model.graph.get_operations()
-                ]
-                for tensor_name in input_operations:
-                    tensor_shape = model.graph.get_tensor_by_name(
-                        f"{tensor_name}:0"
-                    )
-                    layer_shape_dict[tensor_name] = tensor_shape
+                    if tensor_shape != ():
+
+                        if tensor_shape[0] is None:
+
+                            layer_shape_dict[layer_name] = tensor_shape
+                except KeyError:
+                    # Handle the case where the tensor is not found
+                    layer_shape_dict[layer_name] = None
 
     return layer_shape_dict
 
@@ -277,45 +285,99 @@ class AlexNet(Model):
     image_value_range = (-IMAGENET_MEAN_BGR, 255 - IMAGENET_MEAN_BGR)
     input_name = "Placeholder"
 
-
-AlexNet.layers = _layers_from_list_of_dicts(
-    AlexNet(),
-    [
-        {"tags": ["pre_relu", "conv"], "name": "Conv2D", "depth": 96},
-        {"tags": ["pre_relu", "conv"], "name": "Conv2D_1", "depth": 128},
-        {"tags": ["pre_relu", "conv"], "name": "Conv2D_2", "depth": 128},
-        {"tags": ["pre_relu", "conv"], "name": "Conv2D_3", "depth": 384},
-        {"tags": ["pre_relu", "conv"], "name": "Conv2D_4", "depth": 192},
-        {"tags": ["pre_relu", "conv"], "name": "Conv2D_5", "depth": 192},
-        {"tags": ["pre_relu", "conv"], "name": "Conv2D_6", "depth": 128},
-        {"tags": ["pre_relu", "conv"], "name": "Conv2D_7", "depth": 128},
-        {"tags": ["dense"], "name": "Relu", "depth": 4096},
-        {"tags": ["dense"], "name": "Relu_1", "depth": 4096},
-        {"tags": ["dense"], "name": "Softmax", "depth": 1000},
-    ],
-)
+    def __init__(self):
+        self.layers = _layers_from_list_of_dicts(
+            self,
+            [
+                {"tags": ["pre_relu", "conv"], "name": "Conv2D", "depth": 96},
+                {
+                    "tags": ["pre_relu", "conv"],
+                    "name": "Conv2D_1",
+                    "depth": 128,
+                },
+                {
+                    "tags": ["pre_relu", "conv"],
+                    "name": "Conv2D_2",
+                    "depth": 128,
+                },
+                {
+                    "tags": ["pre_relu", "conv"],
+                    "name": "Conv2D_3",
+                    "depth": 384,
+                },
+                {
+                    "tags": ["pre_relu", "conv"],
+                    "name": "Conv2D_4",
+                    "depth": 192,
+                },
+                {
+                    "tags": ["pre_relu", "conv"],
+                    "name": "Conv2D_5",
+                    "depth": 192,
+                },
+                {
+                    "tags": ["pre_relu", "conv"],
+                    "name": "Conv2D_6",
+                    "depth": 128,
+                },
+                {
+                    "tags": ["pre_relu", "conv"],
+                    "name": "Conv2D_7",
+                    "depth": 128,
+                },
+                {"tags": ["dense"], "name": "Relu", "depth": 4096},
+                {"tags": ["dense"], "name": "Relu_1", "depth": 4096},
+                {"tags": ["dense"], "name": "Softmax", "depth": 1000},
+            ],
+        )
+        self.layer_shape_dict = _get_layer_names_tensors(self)
 
 
 class AlexNetv2(Model):
 
     def __init__(
         self,
-        model_path="/Users/vkapoor/Downloads/models/AlexNet/seed5.pb",
+        model_checkpoint_dir="/Users/vkapoor/Downloads/models/AlexNet/training_seed_05",
+        training_seed=5,
     ):
         self.image_shape = [224, 224, 3]
         self.dataset = "Ecoset"
         self.is_BGR = False
         self.image_value_range = (-IMAGENET_MEAN_BGR, 255 - IMAGENET_MEAN_BGR)
         self.input_name = "Placeholder"
-        self.model_path = model_path
+        self.model_checkpoint_dir = model_checkpoint_dir
+        self.training_seed = training_seed
+        self.model_name = os.path.join(
+            self.model_checkpoint_dir, "model.ckpt_epoch89"
+        )
+        self.meta_path = os.path.join(
+            model_checkpoint_dir, "model.ckpt_epoch89.meta"
+        )
+
+        self.layer_shape_dict = _get_layer_names_tensors(self)
 
     @property
     def graph_def(self):
         if not self._graph_def:
-            with tf.io.gfile.GFile(self.model_path, "rb") as f:
-                graph_def = tf.compat.v1.GraphDef()
-                graph_def.ParseFromString(f.read())
-            self._graph_def = graph_def
+            with tf.compat.v1.Session() as sess:
+                saver = tf.compat.v1.train.import_meta_graph(
+                    self.meta_path, clear_devices=True
+                )
+                saver.restore(sess, self.model_name)
+
+                output_node_names = [
+                    n.name
+                    for n in tf.compat.v1.get_default_graph()
+                    .as_graph_def()
+                    .node
+                ]
+                frozen_graph_def = (
+                    tf.compat.v1.graph_util.convert_variables_to_constants(
+                        sess, sess.graph_def, output_node_names
+                    )
+                )
+
+            self._graph_def = frozen_graph_def
         return self._graph_def
 
     def load_model_layers(self):
