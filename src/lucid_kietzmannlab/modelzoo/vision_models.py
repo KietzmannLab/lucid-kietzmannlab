@@ -232,13 +232,13 @@ def plot_selected_layer_tensors(model, input_data, tensors_to_plot=[]):
                 )
 
 
-def _get_layer_names_tensors(model):
+def _get_layer_names_tensors(model: Model):
 
     layer_name_list = [layer_info["name"] for layer_info in model.layers]
     # Get the shape of each layer
     with tf.Graph().as_default() as graph:
         # Import the model
-        tf.import_graph_def(model.graph_def, name="")
+        tf.compat.v1.import_graph_def(model.graph_def, name="")
 
         # Get the shape of each tensor
         layer_shape_dict = {}
