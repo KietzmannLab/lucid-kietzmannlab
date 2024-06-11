@@ -405,12 +405,9 @@ class Model:
         final_input_map = {self.input_name: t_prep_input}
         if input_map is not None:
             final_input_map.update(input_map)
-        if scope == "import":
-            tf.compat.v1.import_graph_def(
-                self.graph_def, final_input_map, name=scope
-            )
-        else:
-            tf.import_graph_def(self.graph_def, final_input_map, name="")
+        tf.compat.v1.import_graph_def(
+            self.graph_def, final_input_map, name=scope
+        )
 
         def T(layer):
             if ":" in layer:

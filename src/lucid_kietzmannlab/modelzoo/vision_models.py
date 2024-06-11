@@ -14,8 +14,6 @@
 # ==============================================================================
 
 
-import os
-import re
 import warnings
 
 import matplotlib.pyplot as plt
@@ -232,34 +230,6 @@ def plot_selected_layer_tensors(model, input_data, tensors_to_plot=[]):
                     sess, model, tensors_to_plot, input_placeholder, input_data
                 )
 
-    if isinstance(model, EcoAlexModel):
-
-        with tf.Graph().as_default() as graph:
-
-            with tf.compat.v1.Session(graph=graph) as sess:
-                model.graph = sess.graph
-                tf.import_graph_def(model.graph_def, name="")
-                # Load the model
-                checkpoint_path = os.path.join(
-                    model.model_checkpoint_dir, model.model_checkpoint
-                )
-                meta_path = os.path.join(
-                    model.model_checkpoint_dir,
-                    f"{model.model_checkpoint}.meta",
-                )
-
-                saver = tf.compat.v1.train.import_meta_graph(
-                    meta_path, clear_devices=True
-                )
-                saver.restore(sess, checkpoint_path)
-
-                input_placeholder = model.graph.get_tensor_by_name(
-                    "Placeholder:0"
-                )
-                model_tensor_plot(
-                    sess, model, tensors_to_plot, input_placeholder, input_data
-                )
-
 
 def get_layer_names_tensors(model):
 
@@ -279,57 +249,6 @@ def get_layer_names_tensors(model):
                         f"{tensor_name}:0"
                     )
                     layer_shape_dict[tensor_name] = tensor_shape
-
-    if isinstance(model, EcoAlexModel):
-
-        with tf.Graph().as_default() as graph:
-
-            with tf.compat.v1.Session(graph=graph) as sess:
-                model.graph = sess.graph
-                tf.import_graph_def(model.graph_def, name="")
-                layer_shape_dict = {}
-                # Load the model
-                checkpoint_path = os.path.join(
-                    model.model_checkpoint_dir, model.model_checkpoint
-                )
-                meta_path = os.path.join(
-                    model.model_checkpoint_dir,
-                    f"{model.model_checkpoint}.meta",
-                )
-
-                saver = tf.compat.v1.train.import_meta_graph(
-                    meta_path, clear_devices=True
-                )
-                saver.restore(sess, checkpoint_path)
-                input_operations = [op for op in model.graph.get_operations()]
-                input_tensor_names = []
-                for op in input_operations:
-                    input_tensor_names.extend(
-                        [output_tensor.name for output_tensor in op.outputs]
-                    )
-
-                pattern = r"(tower_\d+/.*?/(?:conv|fc)\d*/.*?Conv2D)"
-
-                # Set to store the matching layer names
-                matching_layer_names = set()
-
-                # Traverse the graph to find operations matching the pattern
-                for op in model.graph.get_operations():
-                    match = re.search(pattern, op.name)
-                    if match:
-                        matching_layer_names.add(match.group(1))
-                matching_layer_names = {
-                    layer_name
-                    for layer_name in matching_layer_names
-                    if "gradients" not in layer_name
-                }
-
-                for tensor_name in sorted(matching_layer_names):
-                    tensor_shape = model.graph.get_tensor_by_name(
-                        f"{tensor_name}:0"
-                    )
-                    layer_shape_dict[tensor_name] = tensor_shape
-                print("Model loaded from:", model.model_checkpoint_dir)
 
     return layer_shape_dict
 
@@ -377,281 +296,42 @@ AlexNet.layers = _layers_from_list_of_dicts(
 )
 
 
-class EcoAlexModel(Model):
+class AlexNetv2(Model):
 
-    def __init__(self, model_checkpoint_dir, model_checkpoint):
-        self.image_shape = [3, 112, 112]
-        self.dataset = "ImageNet"
-
+    def __init__(
+        self,
+        model_path="/Users/vkapoor/Downloads/models/AlexNet/seed5.pb",
+    ):
+        self.image_shape = [224, 224, 3]
+        self.dataset = "Ecoset"
         self.is_BGR = False
         self.image_value_range = (-IMAGENET_MEAN_BGR, 255 - IMAGENET_MEAN_BGR)
         self.input_name = "Placeholder"
-        self.model_checkpoint_dir = model_checkpoint_dir
-        self.model_checkpoint = model_checkpoint
+        self.model_path = model_path
 
     @property
     def graph_def(self):
-        """Returns the serialized GraphDef representation of the TensorFlow graph."""
-
-        return self.graph.as_graph_def()
+        if not self._graph_def:
+            with tf.io.gfile.GFile(self.model_path, "rb") as f:
+                graph_def = tf.compat.v1.GraphDef()
+                graph_def.ParseFromString(f.read())
+            self._graph_def = graph_def
+        return self._graph_def
 
     def load_model_layers(self):
         self.layers = _layers_from_list_of_dicts(
             self,
             [
-                {
-                    "tags": ["conv"],
-                    "name": "tower_0/alexnet_v2/conv1/Conv2D",
-                    "depth": 64,
-                },
-                {
-                    "tags": ["conv"],
-                    "name": "tower_0/alexnet_v2/conv2/Conv2D",
-                    "depth": 192,
-                },
-                {
-                    "tags": ["conv"],
-                    "name": "tower_0/alexnet_v2/conv3/Conv2D",
-                    "depth": 384,
-                },
-                {
-                    "tags": ["conv"],
-                    "name": "tower_0/alexnet_v2/conv4/Conv2D",
-                    "depth": 384,
-                },
-                {
-                    "tags": ["conv"],
-                    "name": "tower_0/alexnet_v2/conv5/Conv2D",
-                    "depth": 256,
-                },
-                {
-                    "tags": ["dense"],
-                    "name": "tower_0/alexnet_v2/fc6/Conv2D",
-                    "depth": 4096,
-                },
-                {
-                    "tags": ["dense"],
-                    "name": "tower_0/alexnet_v2/fc7/Conv2D",
-                    "depth": 4096,
-                },
-                {
-                    "tags": ["dense"],
-                    "name": "tower_0/alexnet_v2/fc8/Conv2D",
-                    "depth": 565,
-                },
-                {
-                    "tags": ["conv"],
-                    "name": "tower_1/alexnet_v2/conv1/Conv2D",
-                    "depth": 64,
-                },
-                {
-                    "tags": ["conv"],
-                    "name": "tower_1/alexnet_v2/conv2/Conv2D",
-                    "depth": 192,
-                },
-                {
-                    "tags": ["conv"],
-                    "name": "tower_1/alexnet_v2/conv3/Conv2D",
-                    "depth": 384,
-                },
-                {
-                    "tags": ["conv"],
-                    "name": "tower_1/alexnet_v2/conv4/Conv2D",
-                    "depth": 384,
-                },
-                {
-                    "tags": ["conv"],
-                    "name": "tower_1/alexnet_v2/conv5/Conv2D",
-                    "depth": 256,
-                },
-                {
-                    "tags": ["dense"],
-                    "name": "tower_1/alexnet_v2/fc6/Conv2D",
-                    "depth": 4096,
-                },
-                {
-                    "tags": ["dense"],
-                    "name": "tower_1/alexnet_v2/fc7/Conv2D",
-                    "depth": 4096,
-                },
-                {
-                    "tags": ["dense"],
-                    "name": "tower_1/alexnet_v2/fc8/Conv2D",
-                    "depth": 565,
-                },
-                {
-                    "tags": ["conv"],
-                    "name": "tower_2/alexnet_v2/conv1/Conv2D",
-                    "depth": 64,
-                },
-                {
-                    "tags": ["conv"],
-                    "name": "tower_2/alexnet_v2/conv2/Conv2D",
-                    "depth": 192,
-                },
-                {
-                    "tags": ["conv"],
-                    "name": "tower_2/alexnet_v2/conv3/Conv2D",
-                    "depth": 384,
-                },
-                {
-                    "tags": ["conv"],
-                    "name": "tower_2/alexnet_v2/conv4/Conv2D",
-                    "depth": 384,
-                },
-                {
-                    "tags": ["conv"],
-                    "name": "tower_2/alexnet_v2/conv5/Conv2D",
-                    "depth": 256,
-                },
-                {
-                    "tags": ["dense"],
-                    "name": "tower_2/alexnet_v2/fc6/Conv2D",
-                    "depth": 4096,
-                },
-                {
-                    "tags": ["dense"],
-                    "name": "tower_2/alexnet_v2/fc7/Conv2D",
-                    "depth": 4096,
-                },
-                {
-                    "tags": ["dense"],
-                    "name": "tower_2/alexnet_v2/fc8/Conv2D",
-                    "depth": 565,
-                },
-                {
-                    "tags": ["conv"],
-                    "name": "tower_3/alexnet_v2/conv1/Conv2D",
-                    "depth": 64,
-                },
-                {
-                    "tags": ["conv"],
-                    "name": "tower_3/alexnet_v2/conv2/Conv2D",
-                    "depth": 192,
-                },
-                {
-                    "tags": ["conv"],
-                    "name": "tower_3/alexnet_v2/conv3/Conv2D",
-                    "depth": 384,
-                },
-                {
-                    "tags": ["conv"],
-                    "name": "tower_3/alexnet_v2/conv4/Conv2D",
-                    "depth": 384,
-                },
-                {
-                    "tags": ["conv"],
-                    "name": "tower_3/alexnet_v2/conv5/Conv2D",
-                    "depth": 256,
-                },
-                {
-                    "tags": ["dense"],
-                    "name": "tower_3/alexnet_v2/fc6/Conv2D",
-                    "depth": 4096,
-                },
-                {
-                    "tags": ["dense"],
-                    "name": "tower_3/alexnet_v2/fc7/Conv2D",
-                    "depth": 4096,
-                },
-                {
-                    "tags": ["dense"],
-                    "name": "tower_3/alexnet_v2/fc8/Conv2D",
-                    "depth": 565,
-                },
+                {"tags": ["conv"], "name": "conv1/Conv2D", "depth": 64},
+                {"tags": ["conv"], "name": "conv2/Conv2D", "depth": 192},
+                {"tags": ["conv"], "name": "conv3/Conv2D", "depth": 384},
+                {"tags": ["conv"], "name": "conv4/Conv2D", "depth": 384},
+                {"tags": ["conv"], "name": "conv5/Conv2D", "depth": 256},
+                {"tags": ["dense"], "name": "fc6/Conv2D", "depth": 4096},
+                {"tags": ["dense"], "name": "fc7/Conv2D", "depth": 4096},
+                {"tags": ["dense"], "name": "fc8/Conv2D", "depth": 565},
             ],
         )
-
-    def load_ecoset_model_seeds(self):
-
-        with tf.Graph().as_default() as graph:
-            config = tf.compat.v1.ConfigProto()
-            config.graph_options.optimizer_options.global_jit_level = (
-                tf.compat.v1.OptimizerOptions.OFF
-            )
-
-            with tf.compat.v1.Session(graph=graph, config=config) as sess:
-                self.graph = sess.graph
-                tf.import_graph_def(self.graph_def, name="")
-                layer_shape_dict = {}
-                # Load the model
-                checkpoint_path = os.path.join(
-                    self.model_checkpoint_dir, self.model_checkpoint
-                )
-                meta_path = os.path.join(
-                    self.model_checkpoint_dir, f"{self.model_checkpoint}.meta"
-                )
-
-                saver = tf.compat.v1.train.import_meta_graph(
-                    meta_path, clear_devices=True
-                )
-                saver.restore(sess, checkpoint_path)
-                print("Model loaded from:", self.model_checkpoint_dir)
-
-                # Find operations with no incoming edges (i.e., the inputs to the graph)
-                input_operations = [op for op in self.graph.get_operations()]
-
-                # Get the output tensor names of the input operations
-                input_tensor_names = []
-                for op in input_operations:
-                    input_tensor_names.extend(
-                        [output_tensor.name for output_tensor in op.outputs]
-                    )
-
-                pattern = r"(tower_\d+/.*?/(?:conv|fc)\d*/.*?Conv2D)"
-
-                # Set to store the matching layer names
-                matching_layer_names = set()
-
-                # Traverse the graph to find operations matching the pattern
-                for op in self.graph.get_operations():
-                    match = re.search(pattern, op.name)
-                    if match:
-                        matching_layer_names.add(match.group(1))
-                matching_layer_names = {
-                    layer_name
-                    for layer_name in matching_layer_names
-                    if "gradients" not in layer_name
-                }
-
-                for tensor_name in matching_layer_names:
-                    tensor_shape = self.graph.get_tensor_by_name(
-                        f"{tensor_name}:0"
-                    )
-                    layer_shape_dict[tensor_name] = tensor_shape.shape
-
-                for layer, shape in layer_shape_dict.items():
-                    print(f"Layer: {layer}, Shape: {shape}")
-                self.layer_shape_dict = layer_shape_dict
-
-    def perform_forward_pass(
-        self, output_tensor_name="tower_0/alexnet_v2/fc8/Conv2D:0"
-    ):
-        # Generate a random input tensor with the correct shape
-        input_tensor_shape = [1] + self.image_shape  # Batch size of 1
-        random_input = np.random.rand(*input_tensor_shape).astype(np.float32)
-
-        # Perform a forward pass through the model
-        with tf.Graph().as_default() as graph:
-            config = tf.compat.v1.ConfigProto()
-            config.graph_options.optimizer_options.global_jit_level = (
-                tf.compat.v1.OptimizerOptions.OFF
-            )
-
-            with tf.compat.v1.Session(graph=graph, config=config) as sess:
-                # Load the model
-                tf.import_graph_def(self.graph_def, name="")
-                input_tensor = graph.get_tensor_by_name(f"{self.input_name}:0")
-                output_tensor = graph.get_tensor_by_name(
-                    output_tensor_name
-                )  # Example output tensor
-
-                # Run the session to get the output
-                output = sess.run(
-                    output_tensor, feed_dict={input_tensor: random_input}
-                )
-                print("Output shape:", output.shape)
-                print("Output values:", output)
 
 
 trunc_normal = lambda stddev: tf.compat.v1.truncated_normal_initializer(
