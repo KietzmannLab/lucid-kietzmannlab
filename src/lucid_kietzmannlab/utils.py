@@ -62,7 +62,7 @@ def plot_tensor_by_name(model, layer_name_list):
 
 
 def interactive_visualization(
-    model, layer_name, channel, layer_shape_dict, scope="alexnet_v2"
+    model, layer_name, channel, layer_shape_dict, scope=""
 ):
 
     C = lambda neuron: objectives.channel(*neuron)
@@ -73,16 +73,11 @@ def interactive_visualization(
         if 0 <= channel <= max_channel:
             clear_output(wait=True)
             # Render visualization for the selected layer and channel
-            try:
-                _ = render.render_vis(
-                    model, C((layer_name, channel)), scope=scope
-                )
-            except Exception:
-                print("No gradients for this layer")
+            _ = render.render_vis(model, C((layer_name, channel)), scope=scope)
 
 
 def batch_visualization(
-    model, layer_name, layer_shape_dict, channel_slider, scope="alexnet_v2"
+    model, layer_name, layer_shape_dict, channel_slider, scope=""
 ):
     C = lambda neuron: objectives.channel(*neuron)
     if layer_name in layer_shape_dict:

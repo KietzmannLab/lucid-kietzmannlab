@@ -232,31 +232,23 @@ def plot_selected_layer_tensors(model, input_data, tensors_to_plot=[]):
                 )
 
 
-def _get_layer_names_tensors(model: Model):
+def _get_layer_names_tensors(model: Model, scope=""):
 
     layer_name_list = [layer_info["name"] for layer_info in model.layers]
-    # Get the shape of each layer
-    with tf.Graph().as_default() as graph:
-        # Import the model
-        tf.compat.v1.import_graph_def(model.graph_def, name="")
+    t_input = tf.compat.v1.placeholder(tf.float32, [None, *model.image_shape])
 
-        # Get the shape of each tensor
-        layer_shape_dict = {}
-        with tf.compat.v1.Session() as sess:
-            for layer_name in layer_name_list:
-                try:
-                    tensor_shape = sess.graph.get_tensor_by_name(
-                        f"{layer_name}:0"
-                    ).shape
-
-                    if tensor_shape != ():
-
-                        if tensor_shape[0] is None:
-
-                            layer_shape_dict[layer_name] = tensor_shape
-                except KeyError:
-                    # Handle the case where the tensor is not found
-                    layer_shape_dict[layer_name] = None
+    tf.compat.v1.import_graph_def(
+        model.graph_def, {model.input_name: t_input}, name=scope
+    )
+    graph = tf.compat.v1.get_default_graph()
+    output_node_names_ecoset = [n.name for n in graph.as_graph_def().node]
+    layer_shape_dict = {}
+    for layer_name in layer_name_list:
+        try:
+            tensor_shape = graph.get_tensor_by_name(f"{layer_name}:0").shape
+            layer_shape_dict[layer_name] = tensor_shape
+        except Exception:
+            pass
 
     return layer_shape_dict
 
@@ -339,6 +331,7 @@ class AlexNetv2(Model):
         self,
         model_checkpoint_dir="/Users/vkapoor/Downloads/models/AlexNet/training_seed_05",
         training_seed=5,
+        scope="",
     ):
         self.image_shape = [224, 224, 3]
         self.dataset = "Ecoset"
@@ -347,51 +340,81 @@ class AlexNetv2(Model):
         self.input_name = "Placeholder"
         self.model_checkpoint_dir = model_checkpoint_dir
         self.training_seed = training_seed
+        self.scope = scope
         self.model_name = os.path.join(
             self.model_checkpoint_dir, "model.ckpt_epoch89"
         )
+
+        print(f"Loading model with name {self.model_name}")
         self.meta_path = os.path.join(
             model_checkpoint_dir, "model.ckpt_epoch89.meta"
         )
-
+        self.load_model_layers()
         self.layer_shape_dict = _get_layer_names_tensors(self)
 
     @property
     def graph_def(self):
         if not self._graph_def:
             with tf.compat.v1.Session() as sess:
+                # Import the meta graph and restore the weights
                 saver = tf.compat.v1.train.import_meta_graph(
                     self.meta_path, clear_devices=True
                 )
                 saver.restore(sess, self.model_name)
 
-                output_node_names = [
-                    n.name
-                    for n in tf.compat.v1.get_default_graph()
-                    .as_graph_def()
-                    .node
-                ]
-                frozen_graph_def = (
-                    tf.compat.v1.graph_util.convert_variables_to_constants(
-                        sess, sess.graph_def, output_node_names
-                    )
-                )
+                # Fetch the default graph
+                graph = tf.compat.v1.get_default_graph()
 
-            self._graph_def = frozen_graph_def
+                # Initialize all variables
+                sess.run(tf.compat.v1.global_variables_initializer())
+
+                self._graph_def = graph.as_graph_def()
         return self._graph_def
 
     def load_model_layers(self):
         self.layers = _layers_from_list_of_dicts(
             self,
             [
-                {"tags": ["conv"], "name": "conv1/Conv2D", "depth": 64},
-                {"tags": ["conv"], "name": "conv2/Conv2D", "depth": 192},
-                {"tags": ["conv"], "name": "conv3/Conv2D", "depth": 384},
-                {"tags": ["conv"], "name": "conv4/Conv2D", "depth": 384},
-                {"tags": ["conv"], "name": "conv5/Conv2D", "depth": 256},
-                {"tags": ["dense"], "name": "fc6/Conv2D", "depth": 4096},
-                {"tags": ["dense"], "name": "fc7/Conv2D", "depth": 4096},
-                {"tags": ["dense"], "name": "fc8/Conv2D", "depth": 565},
+                {
+                    "tags": ["conv"],
+                    "name": "tower_0/alexnet_v2/conv1/Conv2D",
+                    "depth": 64,
+                },
+                {
+                    "tags": ["conv"],
+                    "name": "tower_0/alexnet_v2/conv2/Conv2D",
+                    "depth": 192,
+                },
+                {
+                    "tags": ["conv"],
+                    "name": "tower_0/alexnet_v2/conv3/Conv2D",
+                    "depth": 384,
+                },
+                {
+                    "tags": ["conv"],
+                    "name": "tower_0/alexnet_v2/conv4/Conv2D",
+                    "depth": 384,
+                },
+                {
+                    "tags": ["conv"],
+                    "name": "tower_0/alexnet_v2/conv5/Conv2D",
+                    "depth": 256,
+                },
+                {
+                    "tags": ["dense"],
+                    "name": "tower_0/alexnet_v2/fc6/Conv2D",
+                    "depth": 4096,
+                },
+                {
+                    "tags": ["dense"],
+                    "name": "tower_0/alexnet_v2/fc7/Conv2D",
+                    "depth": 4096,
+                },
+                {
+                    "tags": ["dense"],
+                    "name": "tower_0/alexnet_v2/fc8/Conv2D",
+                    "depth": 565,
+                },
             ],
         )
 

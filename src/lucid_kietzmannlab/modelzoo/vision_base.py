@@ -411,9 +411,16 @@ class Model:
 
         def T(layer):
             if ":" in layer:
-                return graph.get_tensor_by_name(f"{scope}/{layer}")
+                try:
+                    return graph.get_tensor_by_name(f"{scope}/{layer}")
+                except Exception:
+                    return graph.get_tensor_by_name(f"{layer}")
+
             else:
-                return graph.get_tensor_by_name(f"{scope}/{layer}:0")
+                try:
+                    return graph.get_tensor_by_name(f"{scope}/{layer}:0")
+                except Exception:
+                    return graph.get_tensor_by_name(f"{layer}:0")
 
         return T
 
