@@ -233,7 +233,6 @@ def plot_selected_layer_tensors(
     with tf.Graph().as_default() as graph:
         with tf.compat.v1.Session(graph=graph) as sess:
             model.graph = sess.graph
-            tf.import_graph_def(model.graph_def, name="")
 
             # Assuming input placeholder name is "input"
 
