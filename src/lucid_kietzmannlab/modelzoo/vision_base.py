@@ -122,7 +122,7 @@ def get_activations_iter(
     dtype=None,
     ind_shape=None,
     center_only=False,
-    reverse=False,
+    channels_first=False,
 ):
     """Collect center activtions of a layer over many images from an iterable obj.
 
@@ -159,10 +159,11 @@ def get_activations_iter(
         "max": (lambda a, b: np.maximum(a, b), lambda a, n: a),
     }[reducer]
     shape = [None, None, None, 3]
-    if reverse:
+    if channels_first:
         shape = [None, 3, None, None]
     with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
         t_img = tf.compat.v1.placeholder("float32", shape)
+        print("being here", t_img.shape)
         T = model.import_graph(t_img)
         t_layer = T(layer)
 
@@ -230,6 +231,7 @@ def _get_activations(
     dtype=None,
     ind_shape=None,
     center_only=False,
+    channels_first=False,
 ):
     """Collect center activtions of a layer over an n-dimensional array of images.
 
@@ -280,6 +282,7 @@ def _get_activations(
         dtype=dtype,
         ind_shape=ind_shape,
         center_only=center_only,
+        channels_first=channels_first,
     )
 
 
@@ -374,7 +377,7 @@ class Model:
         if t_input is None:
             t_input = tf.compat.v1.placeholder(tf.float32, self.image_shape)
         t_prep_input = t_input
-
+        print(t_input.shape, t_prep_input.shape)
         if len(t_prep_input.shape) == 3:
             t_prep_input = tf.expand_dims(t_prep_input, 0)
         if forget_xy_shape:
@@ -382,7 +385,11 @@ class Model:
         if hasattr(self, "is_BGR") and self.is_BGR is True:
             t_prep_input = tf.reverse(t_prep_input, [-1])
         lo, hi = self.image_value_range
-        t_prep_input = lo + t_prep_input * (hi - lo)
+        try:
+            t_prep_input = lo + t_prep_input * (hi - lo)
+        except Exception:
+            pass
+
         return t_input, t_prep_input
 
     def import_graph(
@@ -399,7 +406,6 @@ class Model:
             'Scope "%s" already exists. Provide explicit scope names when '
             "importing multiple instances of the model."
         ) % scope
-
         t_input, t_prep_input = self.create_input(t_input, forget_xy_shape)
 
         final_input_map = {self.input_name: t_prep_input}
@@ -610,6 +616,7 @@ class Model:
         dtype=None,
         ind_shape=None,
         center_only=False,
+        channels_first=False,
     ):
         """Collect center activtions of a layer over an n-dimensional array of images.
 
@@ -648,4 +655,5 @@ class Model:
             dtype=dtype,
             ind_shape=ind_shape,
             center_only=center_only,
+            channels_first=channels_first,
         )

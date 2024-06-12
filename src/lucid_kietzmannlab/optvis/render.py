@@ -49,7 +49,7 @@ def render_vis(
     print_objectives=None,
     verbose=True,
     scope="import",
-    reverse=False,
+    channels_first=False,
 ):
     """Flexible optimization-base feature vis.
 
@@ -96,7 +96,7 @@ def render_vis(
             optimizer,
             transforms,
             scope=scope,
-            reverse=reverse,
+            channels_first=channels_first,
         )
         print_objective_func = make_print_objective_func(print_objectives, T)
         loss, vis_op, t_image = T("loss"), T("vis_op"), T("input")
@@ -127,7 +127,7 @@ def make_vis_T(
     optimizer=None,
     transforms=None,
     scope="import",
-    reverse=False,
+    channels_first=False,
 ):
     """Even more flexible optimization-base feature vis.
 
@@ -173,12 +173,14 @@ def make_vis_T(
     """
 
     # pylint: disable=unused-variable
-    t_image = make_t_image(param_f, reverse=reverse)
+    t_image = make_t_image(param_f, channels_first=channels_first)
     objective_f = objectives.as_objective(objective_f)
     transform_f = make_transform_f(transforms)
     optimizer = make_optimizer(optimizer, [])
-
-    T = import_model(model, transform_f(t_image), t_image, scope=scope)
+    if not channels_first:
+        T = import_model(model, transform_f(t_image), t_image, scope=scope)
+    else:
+        T = import_model(model, t_image, t_image, scope=scope)
     loss = objective_f(T)
 
     global_step = tf.Variable(0, trainable=False, name="global_step")
@@ -214,9 +216,9 @@ def make_print_objective_func(print_objectives, T):
 # pylint: enable=invalid-name
 
 
-def make_t_image(param_f, reverse=False):
+def make_t_image(param_f, channels_first=False):
     if param_f is None:
-        t_image = param.image(128, reverse=reverse)
+        t_image = param.image(128, channels_first=channels_first)
     elif callable(param_f):
         t_image = param_f()
     elif isinstance(param_f, tf.Tensor):

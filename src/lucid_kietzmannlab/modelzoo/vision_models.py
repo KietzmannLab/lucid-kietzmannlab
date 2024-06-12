@@ -180,10 +180,17 @@ def populate_inception_bottlenecks(scope):
 
 
 def model_tensor_plot(
-    sess, model, tensors_to_plot, input_placeholder, input_data
+    sess,
+    model,
+    tensors_to_plot,
+    input_placeholder,
+    input_data,
+    channels_first=False,
 ):
     # Run the model to get the values of the specified tensors
     layer_values_dict = {}
+    for tensor_name in tensors_to_plot:
+        print(model.graph.get_tensor_by_name(f"{tensor_name}:0").shape)
     tensor_values = sess.run(
         [
             model.graph.get_tensor_by_name(f"{tensor_name}:0")
@@ -195,6 +202,9 @@ def model_tensor_plot(
     for tensor_name, tensor_value in zip(tensors_to_plot, tensor_values):
         layer_values_dict[tensor_name] = tensor_value
         plot_tensor_value = tensor_value[0, :]
+
+        if channels_first:
+            plot_tensor_value = np.transpose(plot_tensor_value, (1, 2, 0))
         num_channels = plot_tensor_value.shape[-1]
         # Calculate grid size
         if len(plot_tensor_value.shape) > 1:
@@ -215,21 +225,25 @@ def model_tensor_plot(
             plt.show()
 
 
-def plot_selected_layer_tensors(model, input_data, tensors_to_plot=[]):
-    if isinstance(model, AlexNet):
-        with tf.Graph().as_default() as graph:
-            with tf.compat.v1.Session(graph=graph) as sess:
-                model.graph = sess.graph
-                tf.import_graph_def(model.graph_def, name="")
+def plot_selected_layer_tensors(
+    model, input_data, tensors_to_plot=[], channels_first=False
+):
+    with tf.Graph().as_default() as graph:
+        with tf.compat.v1.Session(graph=graph) as sess:
+            model.graph = sess.graph
+            tf.import_graph_def(model.graph_def, name="")
 
-                # Assuming input placeholder name is "input"
+            # Assuming input placeholder name is "input"
 
-                input_placeholder = model.graph.get_tensor_by_name(
-                    "Placeholder:0"
-                )
-                model_tensor_plot(
-                    sess, model, tensors_to_plot, input_placeholder, input_data
-                )
+            input_placeholder = model.graph.get_tensor_by_name("Placeholder:0")
+            model_tensor_plot(
+                sess,
+                model,
+                tensors_to_plot,
+                input_placeholder,
+                input_data,
+                channels_first=channels_first,
+            )
 
 
 def _get_layer_names_tensors(model: Model, scope=""):
@@ -333,7 +347,7 @@ class AlexNetv2(Model):
         training_seed=5,
         scope="",
     ):
-        self.image_shape = [224, 224, 3]
+        self.image_shape = [3, 227, 227]
         self.dataset = "Ecoset"
         self.is_BGR = False
         self.image_value_range = (-IMAGENET_MEAN_BGR, 255 - IMAGENET_MEAN_BGR)
@@ -356,19 +370,17 @@ class AlexNetv2(Model):
     def graph_def(self):
         if not self._graph_def:
             with tf.compat.v1.Session() as sess:
-                # Import the meta graph and restore the weights
                 saver = tf.compat.v1.train.import_meta_graph(
                     self.meta_path, clear_devices=True
                 )
                 saver.restore(sess, self.model_name)
-
-                # Fetch the default graph
                 graph = tf.compat.v1.get_default_graph()
 
                 # Initialize all variables
                 sess.run(tf.compat.v1.global_variables_initializer())
 
                 self._graph_def = graph.as_graph_def()
+
         return self._graph_def
 
     def load_model_layers(self):

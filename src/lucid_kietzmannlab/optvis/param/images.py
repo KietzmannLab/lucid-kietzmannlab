@@ -33,17 +33,17 @@ def image(
     fft=True,
     alpha=False,
     show=False,
-    reverse=False,
+    channels_first=False,
 ):
     h = h or w
     batch = batch or 1
     channels = 4 if alpha else 3
     shape = [batch, w, h, channels]
-    if reverse:
+    if channels_first:
         shape = [batch, channels, w, h]
     param_f = fft_image if fft else naive
     t = param_f(shape, sd=sd)
-    if not reverse:
+    if not channels_first:
         rgb = to_valid_rgb(t[..., :3], decorrelate=decorrelate, sigmoid=True)
     else:
         rgb = t

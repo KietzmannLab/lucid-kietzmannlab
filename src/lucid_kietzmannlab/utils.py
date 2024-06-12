@@ -62,7 +62,12 @@ def plot_tensor_by_name(model, layer_name_list):
 
 
 def interactive_visualization(
-    model, layer_name, channel, layer_shape_dict, scope=""
+    model,
+    layer_name,
+    channel,
+    layer_shape_dict,
+    scope="",
+    channels_first=False,
 ):
 
     C = lambda neuron: objectives.channel(*neuron)
@@ -73,11 +78,21 @@ def interactive_visualization(
         if 0 <= channel <= max_channel:
             clear_output(wait=True)
             # Render visualization for the selected layer and channel
-            _ = render.render_vis(model, C((layer_name, channel)), scope=scope)
+            _ = render.render_vis(
+                model,
+                C((layer_name, channel)),
+                scope=scope,
+                channels_first=channels_first,
+            )
 
 
 def batch_visualization(
-    model, layer_name, layer_shape_dict, channel_slider, scope=""
+    model,
+    layer_name,
+    layer_shape_dict,
+    channel_slider,
+    scope="",
+    channels_first=False,
 ):
     C = lambda neuron: objectives.channel(*neuron)
     if layer_name in layer_shape_dict:
@@ -86,7 +101,11 @@ def batch_visualization(
             image_channel = {}
             for channel in tqdm(range(channel_slider.max)):
                 images = render.render_vis(
-                    model, C((layer_name, channel)), verbose=False, scope=scope
+                    model,
+                    C((layer_name, channel)),
+                    verbose=False,
+                    scope=scope,
+                    channels_first=channels_first,
                 )
                 image_channel[channel] = images
         except Exception:
