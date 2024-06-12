@@ -186,8 +186,10 @@ def model_tensor_plot(
     input_placeholder,
     input_data,
     channels_first=False,
+    feed_dict={},
 ):
     # Run the model to get the values of the specified tensors
+    feed_dict[input_placeholder] = input_data
     layer_values_dict = {}
     for tensor_name in tensors_to_plot:
         print(model.graph.get_tensor_by_name(f"{tensor_name}:0").shape)
@@ -196,7 +198,7 @@ def model_tensor_plot(
             model.graph.get_tensor_by_name(f"{tensor_name}:0")
             for tensor_name in tensors_to_plot
         ],
-        feed_dict={input_placeholder: input_data},
+        feed_dict=feed_dict,
     )
 
     for tensor_name, tensor_value in zip(tensors_to_plot, tensor_values):
@@ -236,6 +238,16 @@ def plot_selected_layer_tensors(
             # Assuming input placeholder name is "input"
 
             input_placeholder = model.graph.get_tensor_by_name("Placeholder:0")
+            try:
+                boolean_placeholder = model.graph.get_tensor_by_name(
+                    "load_data/Placeholder:0"
+                )
+
+                feed_dict = {boolean_placeholder: False}
+            except Exception:
+
+                feed_dict = {}
+
             model_tensor_plot(
                 sess,
                 model,
@@ -243,6 +255,7 @@ def plot_selected_layer_tensors(
                 input_placeholder,
                 input_data,
                 channels_first=channels_first,
+                feed_dict=feed_dict,
             )
 
 
@@ -250,7 +263,6 @@ def _get_layer_names_tensors(model: Model, scope=""):
 
     layer_name_list = [layer_info["name"] for layer_info in model.layers]
     t_input = tf.compat.v1.placeholder(tf.float32, [None, *model.image_shape])
-
     tf.compat.v1.import_graph_def(
         model.graph_def, {model.input_name: t_input}, name=scope
     )
