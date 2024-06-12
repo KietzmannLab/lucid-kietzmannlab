@@ -64,8 +64,11 @@ def plot_selected_layer_tensors(
             model.graph = sess.graph
             tf.import_graph_def(model.graph_def, name="")
 
-            # Initialize variables
-            sess.run(tf.compat.v1.global_variables_initializer())
+            # Restore model weights
+            saver = tf.compat.v1.train.Saver()
+            saver.restore(
+                sess, tf.train.latest_checkpoint(model_checkpoint_dir)
+            )
 
             # Assuming input placeholder name is "Placeholder"
             input_placeholder = model.graph.get_tensor_by_name("Placeholder:0")
