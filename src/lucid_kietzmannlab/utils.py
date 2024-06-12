@@ -65,25 +65,25 @@ def interactive_visualization(
     model,
     layer_name,
     channel,
-    layer_shape_dict,
     scope="",
     channels_first=False,
 ):
 
     C = lambda neuron: objectives.channel(*neuron)
+    graph = tf.compat.v1.get_default_graph()
+    tensor = graph.get_tensor_by_name(f"{layer_name}:0")
+    tensor_shape = tensor.shape
     # Check if the layer exists in the shape dictionary
-    if layer_name in layer_shape_dict:
-        # Check if the selected channel is within bounds
-        max_channel = layer_shape_dict[layer_name][-1] - 1
-        if 0 <= channel <= max_channel:
-            clear_output(wait=True)
-            # Render visualization for the selected layer and channel
-            _ = render.render_vis(
-                model,
-                C((layer_name, channel)),
-                scope=scope,
-                channels_first=channels_first,
-            )
+    max_channel = tensor_shape[-1] - 1
+    if 0 <= channel <= max_channel:
+        clear_output(wait=True)
+        # Render visualization for the selected layer and channel
+        _ = render.render_vis(
+            model,
+            C((layer_name, channel)),
+            scope=scope,
+            channels_first=channels_first,
+        )
 
 
 def batch_visualization(
