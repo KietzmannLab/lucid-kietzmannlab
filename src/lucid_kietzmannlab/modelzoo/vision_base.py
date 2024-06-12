@@ -377,7 +377,6 @@ class Model:
         if t_input is None:
             t_input = tf.compat.v1.placeholder(tf.float32, self.image_shape)
         t_prep_input = t_input
-        print(t_input.shape, t_prep_input.shape)
         if len(t_prep_input.shape) == 3:
             t_prep_input = tf.expand_dims(t_prep_input, 0)
         if forget_xy_shape:
