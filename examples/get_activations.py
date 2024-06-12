@@ -56,7 +56,6 @@ def model_tensor_plot(
             plt.show()
 
 
-# Modified plot_selected_layer_tensors function to include feed_dict
 def plot_selected_layer_tensors(
     model, input_data, tensors_to_plot=[], channels_first=False
 ):
@@ -64,6 +63,9 @@ def plot_selected_layer_tensors(
         with tf.compat.v1.Session(graph=graph) as sess:
             model.graph = sess.graph
             tf.import_graph_def(model.graph_def, name="")
+
+            # Initialize variables
+            sess.run(tf.compat.v1.global_variables_initializer())
 
             # Assuming input placeholder name is "Placeholder"
             input_placeholder = model.graph.get_tensor_by_name("Placeholder:0")
