@@ -1,0 +1,1 @@
+{"model_folder": "/Users/vkapoor/python_workspace/lucid-kietzmannlab/examples/codeocean/extract_activations.py", "ckpt_name": "model.ckpt_epoch89", "save_dir": "training_seed_01", "model_type": "b_net_alexnet", "n_layers": 7, "layer_features": [64, 192, 384, 384, 256, 4096, 4096]}
