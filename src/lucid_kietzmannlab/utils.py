@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import tensorflow.compat.v1 as tf
+import tensorflow as tf
 from IPython.display import clear_output
 from scipy.ndimage import convolve
 from skimage.filters import gabor_kernel
@@ -66,6 +66,7 @@ def plot_tensor_by_name(model, layer_name_list):
 
 def interactive_visualization(
     model,
+    graph,
     layer_name,
     channel,
     scope="",
@@ -73,7 +74,9 @@ def interactive_visualization(
 ):
 
     C = lambda neuron: objectives.channel(*neuron)
-    graph = tf.compat.v1.get_default_graph()
+    for op in graph.operations:
+
+        print(op.name)
     tensor = graph.get_tensor_by_name(f"{layer_name}:0")
     tensor_shape = tensor.shape
     # Check if the layer exists in the shape dictionary

@@ -25,6 +25,10 @@ from PIL import Image
 from scipy.io import loadmat, savemat
 from scipy.spatial.distance import pdist
 
+from lucid_kietzmannlab.modelzoo.vision_models import AlexNetCodeOcean
+from lucid_kietzmannlab.utils import interactive_visualization
+
+tf.compat.v1.disable_eager_execution()
 trunc_normal = lambda stddev: tf.compat.v1.truncated_normal_initializer(
     0.0, stddev
 )
@@ -393,51 +397,24 @@ def load_images(exp_stimuli_path):
     return np.array(images_list), image_name_list
 
 
-# %% extract activations
-
-
 def build_graph(
-    model_type,
     loaded_images,
-    n_layers=7,
     n_timesteps=1,
-    layer_features=(64, 192, 384, 384, 256, 4096, 4096),
     output_size=565,
-    k_size=(11, 5, 3, 3, 3, 3, 5, 1),
-    pool_size=(None, 3, 3, None, None, None, None, None),
 ):
-    """
-    Builds the graph for the model to be tested. Includes image centring
-
-    Args:
-        model_type:     the type of the model to be tested of: b, bt, bl, blt
-        n_layers:       the number of layers to build into the graph
-        layer_features: the number of features to build into the graph
-
-    Returns:
-        graph:    the computational graph for the model
-        model:    the model object
-    """
 
     graph = tf.Graph()
     with graph.as_default():
 
         if RANDOM_SEED_GRAPH is not None:
-            # set the graph based random seed
             tf.compat.v1.set_random_seed(RANDOM_SEED_GRAPH)
 
-        # model_device = '/gpu:0'
-        # data_format = 'NCHW'
-        # loaded_images = np.transpose(loaded_images, (0, 3, 1, 2))
         model_device = "/cpu:0"
         data_format = "NHWC"
 
-        # define the images placeholder
         img_ph = tf.compat.v1.placeholder(
             tf.uint8, np.shape(loaded_images)[1:], "images_ph"
         )
-
-        # rescale the image
         image_float32 = tf.image.convert_image_dtype(img_ph, tf.float32)
         image_rescaled = (image_float32 - 0.5) * 2
         images_tensor = image_rescaled
@@ -746,40 +723,39 @@ loaded_images, image_name_list = load_images(os.path.join(exp_stimuli_path))
 
 # build the tensor graph
 graph, images_tensor, model, img_ph = build_graph(
-    model_type,
     loaded_images,
-    n_layers=n_layers,
     n_timesteps=n_timesteps,
-    layer_features=layer_features,
     output_size=output_size,
 )
+lucid_model = AlexNetCodeOcean(graph)
 
-# extract activations
-extract_and_save_activations(
-    loaded_images,
-    image_name_list,
-    save_path_activations,
-    graph,
-    images_tensor,
-    model,
-    ckpt_path,
-    exp_stimuli_cat_limit,
-    layer,
-    img_ph,
-)
 
-if compute_RDMs_bool:
-    compute_RDMs(
-        loaded_images,
-        image_name_list,
-        save_path_activations,
-        graph,
-        images_tensor,
-        model,
-        ckpt_path,
-        exp_stimuli_cat_limit,
-        layer,
-    )
+interactive_visualization(lucid_model, graph, "alexnet_v2/conv4/Conv2D", 0)
+# extract_and_save_activations(
+#    loaded_images,
+#    image_name_list,
+#    save_path_activations,
+#    graph,
+#    images_tensor,
+#    model,
+#    ckpt_path,
+#    exp_stimuli_cat_limit,
+#    layer,
+#    img_ph,
+# )
+
+# if compute_RDMs_bool:
+#    compute_RDMs(
+#        loaded_images,
+#        image_name_list,
+#        save_path_activations,
+#        graph,
+#       images_tensor,
+#       model,
+#       ckpt_path,
+#       exp_stimuli_cat_limit,
+#        layer,
+#    )
 
 
 # save analysis parameters

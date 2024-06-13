@@ -5,13 +5,7 @@ DNN_architecture = "AlexNet"
 training_set = "ecoset"
 training_seed = 1
 layers = [
-    1,
-    2,
-    3,
-    4,
-    5,
-    6,
-    7,
+    2
 ]  # Alexnet layers 1-7, [8:9] AlexNet output before (8) and after (9) softmax
 
 image_dir_parent = "/Users/vkapoor/Downloads/input_image_sets/"

@@ -351,6 +351,25 @@ class AlexNet(Model):
         self.layer_shape_dict = _get_layer_names_tensors(self)
 
 
+class AlexNetCodeOcean(Model):
+
+    def __init__(self, graph):
+
+        self.image_shape = [227, 227, 3]
+        self.dataset = "Ecoset"
+        self.is_BGR = False
+        self.image_value_range = (-IMAGENET_MEAN_BGR, 255 - IMAGENET_MEAN_BGR)
+        self.input_name = "Placeholder"
+        self.graph = graph
+
+    @property
+    def graph_def(self):
+        if not self._graph_def:
+            graph = tf.compat.v1.get_default_graph()
+            self._graph_def = graph.as_graph_def()
+        return self._graph_def
+
+
 class AlexNetv2(Model):
 
     def __init__(
