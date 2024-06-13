@@ -52,7 +52,6 @@ class ConvNet:
         self.weight_list = []
 
         self.readout_weights = {"b": None, "l": None, "bias": None}
-
         if self.input.get_shape().ndims == 5:
             self.n_timesteps = self.input.get_shape().as_list()[1]
             self.is_sequence = True
@@ -61,7 +60,6 @@ class ConvNet:
             self.is_sequence = False
 
         self.image_sizes = [None] * self.n_layers
-
         # normally altered in the network class inheriting from this
 
         self.output_size = 2  # number of classes

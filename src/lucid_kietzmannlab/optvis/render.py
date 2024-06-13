@@ -177,6 +177,7 @@ def make_vis_T(
     objective_f = objectives.as_objective(objective_f)
     transform_f = make_transform_f(transforms)
     optimizer = make_optimizer(optimizer, [])
+    print(t_image.shape)
     if not channels_first:
         T = import_model(model, transform_f(t_image), t_image, scope=scope)
     else:

@@ -24,6 +24,7 @@ import tf_slim as slim
 from cachetools.func import lru_cache
 
 from lucid_kietzmannlab.misc.io import loading
+from lucid_kietzmannlab.modelzoo.conv_net import ConvNet
 from lucid_kietzmannlab.modelzoo.vision_base import Model
 
 PATH_TEMPLATE = "gs://modelzoo/aligned-activations/{}/{}-{:05d}-of-01000.npy"
@@ -351,23 +352,184 @@ class AlexNet(Model):
         self.layer_shape_dict = _get_layer_names_tensors(self)
 
 
+class AlexNetCore(ConvNet):
+    """
+    Class used for building model.
+
+    Attributes:
+        output_size:     the number of classes to output with the readout
+        keep_prob:       keep probability for dropout, set as a placeholder to vary from training to
+                         validation
+    """
+
+    def __init__(
+        self,
+        input_images,
+        reuse_variables=False,
+        n_layers=7,
+        default_timesteps=1,
+        data_format="NCHW",
+        var_device="/cpu:0",
+        model_name="b_net",
+        random_seed=None,
+    ):
+        """
+        Args:
+            input_images:      input images to the network should be 4-d for images,
+                               e.g. [batch, channels, height, width], or 5-d for movies,
+                               e.g. [batch, time, channels, height, width]
+            reuse_variables:   whether to create or reuse variables
+            data_format:       NCHW for GPUs and NHWC for CPUs
+            var_device:        device for storing model variables (recognisable by tensorflow),
+                               CPU is recommended when parallelising across GPUs, GPU is recommended
+                               when a single GPU is used
+        """
+
+        default_timesteps = 1
+        ConvNet.__init__(
+            self,
+            input_images,
+            reuse_variables,
+            n_layers,
+            default_timesteps,
+            data_format,
+            var_device,
+            model_name,
+            random_seed,
+        )
+
+        # the only things that matter
+        self.output_size = 2  # number of classes
+        self.activations = [
+            [None] * self.n_layers for _ in range(self.n_timesteps)
+        ]
+        self.readout = [None] * self.n_timesteps
+        self.keep_prob = 0.5
+
+        # set in the script but ignored
+        self.dropout_type = None
+        self.is_training = None
+
+    def get_model_params(self, affix="model_params", ignore_attr=[]):
+        """
+        Returns a dictionary containing parmeters defining the model ignoring any methods and
+        any attributes in self.get_params_ignore or ignore_attr
+        """
+
+        model_param_dict = {"ALEXNET": "special case"}
+
+        return model_param_dict
+
+    def build_model(self):
+        """
+        Builds the computational graph for the model
+        """
+
+        with slim.arg_scope(
+            [slim.model_variable, slim.variable], device=self.var_device
+        ):
+            readout, act, weights = alexnet_v2(
+                self.input,
+                self.output_size,
+                dropout_keep_prob=self.keep_prob,
+                reuse_variables=self.reuse_variables,
+                data_format=self.data_format,
+            )
+
+        self.readout = [readout]
+        self.weight_list = weights
+        self.activations = [act]
+
+
 class AlexNetCodeOcean(Model):
 
-    def __init__(self, graph):
+    def __init__(self, model_dir, random_seed=1, output_size=565, vis_layer=1):
 
-        self.image_shape = [227, 227, 3]
+        self.ckpt_path = os.path.join(model_dir, "model.ckpt_epoch89")
+        self.model_dir = model_dir
+        self.output_size = output_size
+        self.image_shape = [224, 224, 3]
         self.dataset = "Ecoset"
+        self._vis_layer = vis_layer
         self.is_BGR = False
         self.image_value_range = (-IMAGENET_MEAN_BGR, 255 - IMAGENET_MEAN_BGR)
-        self.input_name = "Placeholder"
-        self.graph = graph
+        self.input_name = "images_ph"
+        self.dropout_type = "bernoulli"
+        self.random_seed = random_seed
+        shape = [1, *self.image_shape]
+        loaded_images = np.random.rand(*shape)
+        self._build_graph(loaded_images)
+
+    @property
+    def vis_layer(self):
+        return self._vis_layer
+
+    @vis_layer.setter
+    def vis_layer(self, value):
+        self._vis_layer = value
 
     @property
     def graph_def(self):
         if not self._graph_def:
-            graph = tf.compat.v1.get_default_graph()
-            self._graph_def = graph.as_graph_def()
+            self._graph_def = self.graph.as_graph_def()
         return self._graph_def
+
+    def visualize_layer(self):
+        config = tf.compat.v1.ConfigProto()
+        config.gpu_options.allow_growth = True
+
+        with tf.compat.v1.Session(graph=self.graph, config=config) as sess:
+
+            activations = self.model.activations
+            activations_readout_before_softmax = (
+                self.model.readout
+            )  # batch_size x class
+            activations_readout_after_softmax = tf.nn.softmax(
+                activations_readout_before_softmax
+            )
+
+            # restore the network
+            saver = tf.compat.v1.train.Saver()
+            saver.restore(sess, self.ckpt_path)
+
+    def _build_graph(
+        self,
+        loaded_images,
+        n_timesteps=1,
+        output_size=565,
+    ):
+
+        self.graph = tf.Graph()
+        with self.graph.as_default():
+
+            if self.random_seed is not None:
+                tf.compat.v1.set_random_seed(self.random_seed)
+
+            model_device = "/cpu:0"
+            data_format = "NHWC"
+
+            img_ph = tf.compat.v1.placeholder(
+                tf.float32, np.shape(loaded_images)[1:], self.input_name
+            )
+            image_float32 = tf.image.convert_image_dtype(img_ph, tf.float32)
+            image_rescaled = (image_float32 - 0.5) * 2
+
+            image_tiled = tf.tile(
+                tf.expand_dims(image_rescaled, 0), [1, 1, 1, 1]
+            )
+            self.model = AlexNetCore(
+                image_tiled,
+                var_device=model_device,
+                default_timesteps=n_timesteps,
+                data_format=data_format,
+                random_seed=self.random_seed,
+            )
+
+            self.model.output_size = output_size
+            self.model.dropout_type = self.dropout_type
+            self.model.net_mode = "test"
+            self.model.is_training = False
+            self.model.build_model()
 
 
 class AlexNetv2(Model):

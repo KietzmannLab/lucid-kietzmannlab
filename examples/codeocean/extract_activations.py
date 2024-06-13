@@ -20,13 +20,11 @@ import time
 import numpy as np
 import tensorflow as tf
 import tf_slim as slim
-from conv_net import ConvNet
 from PIL import Image
 from scipy.io import loadmat, savemat
 from scipy.spatial.distance import pdist
 
-from lucid_kietzmannlab.modelzoo.vision_models import AlexNetCodeOcean
-from lucid_kietzmannlab.utils import interactive_visualization
+from lucid_kietzmannlab.modelzoo.conv_net import ConvNet
 
 tf.compat.v1.disable_eager_execution()
 trunc_normal = lambda stddev: tf.compat.v1.truncated_normal_initializer(
@@ -411,16 +409,15 @@ def build_graph(
 
         model_device = "/cpu:0"
         data_format = "NHWC"
-
+        print(loaded_images.shape)
         img_ph = tf.compat.v1.placeholder(
-            tf.uint8, np.shape(loaded_images)[1:], "images_ph"
+            tf.float32, np.shape(loaded_images)[1:], "images_ph"
         )
         image_float32 = tf.image.convert_image_dtype(img_ph, tf.float32)
         image_rescaled = (image_float32 - 0.5) * 2
         images_tensor = image_rescaled
 
         image_tiled = tf.tile(tf.expand_dims(image_rescaled, 0), [1, 1, 1, 1])
-
         model = AlexNet(
             image_tiled,
             var_device=model_device,
@@ -727,35 +724,32 @@ graph, images_tensor, model, img_ph = build_graph(
     n_timesteps=n_timesteps,
     output_size=output_size,
 )
-lucid_model = AlexNetCodeOcean(graph)
 
+extract_and_save_activations(
+    loaded_images,
+    image_name_list,
+    save_path_activations,
+    graph,
+    images_tensor,
+    model,
+    ckpt_path,
+    exp_stimuli_cat_limit,
+    layer,
+    img_ph,
+)
 
-interactive_visualization(lucid_model, graph, "alexnet_v2/conv4/Conv2D", 0)
-# extract_and_save_activations(
-#    loaded_images,
-#    image_name_list,
-#    save_path_activations,
-#    graph,
-#    images_tensor,
-#    model,
-#    ckpt_path,
-#    exp_stimuli_cat_limit,
-#    layer,
-#    img_ph,
-# )
-
-# if compute_RDMs_bool:
-#    compute_RDMs(
-#        loaded_images,
-#        image_name_list,
-#        save_path_activations,
-#        graph,
-#       images_tensor,
-#       model,
-#       ckpt_path,
-#       exp_stimuli_cat_limit,
-#        layer,
-#    )
+if compute_RDMs_bool:
+    compute_RDMs(
+        loaded_images,
+        image_name_list,
+        save_path_activations,
+        graph,
+        images_tensor,
+        model,
+        ckpt_path,
+        exp_stimuli_cat_limit,
+        layer,
+    )
 
 
 # save analysis parameters
