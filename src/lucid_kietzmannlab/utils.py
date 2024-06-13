@@ -89,25 +89,22 @@ def interactive_visualization(
 def batch_visualization(
     model,
     layer_name,
-    layer_shape_dict,
     channel_slider,
     scope="",
     channels_first=False,
 ):
     C = lambda neuron: objectives.channel(*neuron)
-    if layer_name in layer_shape_dict:
-        # Check if the selected channel is within bounds
-        try:
-            image_channel = {}
-            for channel in tqdm(range(channel_slider.max)):
-                images = render.render_vis(
-                    model,
-                    C((layer_name, channel)),
-                    verbose=False,
-                    scope=scope,
-                    channels_first=channels_first,
-                )
-                image_channel[channel] = images
-        except Exception:
-            print("No gradients for this layer")
+    try:
+        image_channel = {}
+        for channel in tqdm(range(channel_slider.max)):
+            images = render.render_vis(
+                model,
+                C((layer_name, channel)),
+                verbose=False,
+                scope=scope,
+                channels_first=channels_first,
+            )
+            image_channel[channel] = images
+    except Exception:
+        print("No gradients for this layer")
     return image_channel
