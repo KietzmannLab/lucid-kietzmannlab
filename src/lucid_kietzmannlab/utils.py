@@ -1,6 +1,9 @@
 import matplotlib.pyplot as plt
+import numpy as np
 import tensorflow.compat.v1 as tf
 from IPython.display import clear_output
+from scipy.ndimage import convolve
+from skimage.filters import gabor_kernel
 from tqdm import tqdm
 
 import lucid_kietzmannlab.optvis.objectives as objectives
@@ -108,3 +111,45 @@ def batch_visualization(
     except Exception:
         print("No gradients for this layer")
     return image_channel
+
+
+def generate_gabor_kernels(frequencies, orientations):
+    kernels = []
+    for theta in orientations:
+        for frequency in frequencies:
+            kernel = gabor_kernel(frequency, theta=theta)
+            kernels.append(kernel)
+    return kernels
+
+
+def apply_gabor_kernels(image, kernels):
+    responses = []
+    for kernel in kernels:
+        filtered = convolve(image, np.real(kernel))
+        responses.append(filtered)
+    return responses
+
+
+def extract_gabor_orientation(responses, orientations):
+    orientation_map = np.zeros_like(responses[0])
+    max_response = np.zeros_like(responses[0], dtype=np.float32)
+
+    for i, response in enumerate(responses):
+        orientation = orientations[i % len(orientations)]
+        mask = response > max_response
+        orientation_map[mask] = orientation
+        max_response[mask] = response[mask]
+
+    return orientation_map
+
+
+def plot_gabor_kernels(frequencies, kernels):
+    num_kernels = len(kernels)
+    cols = len(frequencies)
+    rows = len(kernels) // cols
+    fig, axes = plt.subplots(rows, cols, figsize=(12, 8))
+    for ax, kernel in zip(axes.flat, kernels):
+        ax.imshow(np.real(kernel), cmap="gray")
+        ax.axis("off")
+    plt.tight_layout()
+    plt.show()
