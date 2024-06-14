@@ -502,7 +502,9 @@ class AlexNetCodeOcean(Model):
             self._graph_def = self.graph.as_graph_def()
         return self._graph_def
 
-    def lucid_visualize_layer(self, batch=False):
+    def lucid_visualize_layer(
+        self, batch=False, channel_start=0, channel_end=-1
+    ):
         config = tf.compat.v1.ConfigProto()
         config.gpu_options.allow_growth = True
         C = lambda neuron: objectives.channel(*neuron)
@@ -530,8 +532,9 @@ class AlexNetCodeOcean(Model):
             max_channel = tensor_shape[-1] - 1
             image_channel = {}
             if batch:
-
-                for channel in tqdm(range(max_channel)):
+                if channel_end == -1:
+                    channel_end = max_channel
+                for channel in tqdm(range(channel_start, channel_end)):
                     objective_f = C((layer_name, channel))
                     T = render.make_vis_T(
                         self, objective_f, scope=f"import_{channel}"
