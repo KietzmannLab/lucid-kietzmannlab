@@ -1,3 +1,5 @@
+import logging
+
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
@@ -8,6 +10,13 @@ from tqdm import tqdm
 
 import lucid_kietzmannlab.optvis.objectives as objectives
 import lucid_kietzmannlab.optvis.render as render
+from lucid_kietzmannlab.misc.io import showing
+
+# pylint: disable=invalid-name
+
+
+# create logger with module name, e.g. lucid.misc.io.reading
+log = logging.getLogger(__name__)
 
 
 def plot_tensor(tensor_values, title, n_channel=0):
@@ -64,6 +73,62 @@ def plot_tensor_by_name(model, layer_name_list):
                     print(f"Tensor {layer_name} not found")
 
 
+def codeocean_interactive_visualization(
+    model,
+    graph,
+    sess,
+    layer_name,
+    channel,
+    scope="",
+    channels_first=False,
+    thresholds=(512,),
+    print_objectives=None,
+    verbose=True,
+):
+
+    C = lambda neuron: objectives.channel(*neuron)
+
+    tensor = graph.get_tensor_by_name(f"{layer_name}:0")
+    tensor_shape = tensor.shape
+    max_channel = tensor_shape[-1] - 1
+    if 0 <= channel <= max_channel:
+        clear_output(wait=True)
+        objective_f = C((layer_name, channel))
+        T = render.make_vis_T(
+            model, objective_f, scope=scope, channels_first=channels_first
+        )
+        print_objective_func = render.make_print_objective_func(
+            print_objectives, T
+        )
+        loss, vis_op, t_image = T("loss"), T("vis_op"), T("input")
+
+        images = []
+
+        img_ph = tf.compat.v1.placeholder(
+            tf.float32, t_image.shape, "images_ph"
+        )
+        print("before sess", img_ph.shape)
+        try:
+            for i in range(max(thresholds) + 1):
+                t_image_val = sess.run(t_image)
+                print("going in ses", t_image_val.shape, type(t_image_val))
+                loss_, _ = sess.run(
+                    [loss, vis_op], feed_dict={img_ph: t_image_val}
+                )
+                if i in thresholds:
+                    vis = t_image.eval()
+                    images.append(vis)
+                    if verbose:
+                        print_objective_func(sess)
+                        showing.show(np.hstack(vis))
+        except KeyboardInterrupt:
+            log.warn(f"Interrupted optimization at step {i+1:d}.")
+            vis = t_image.eval()
+            showing.show(np.hstack(vis))
+
+        return images
+
+
 def interactive_visualization(
     model,
     graph,
@@ -74,16 +139,12 @@ def interactive_visualization(
 ):
 
     C = lambda neuron: objectives.channel(*neuron)
-    for op in graph.operations:
 
-        print(op.name)
     tensor = graph.get_tensor_by_name(f"{layer_name}:0")
     tensor_shape = tensor.shape
-    # Check if the layer exists in the shape dictionary
     max_channel = tensor_shape[-1] - 1
     if 0 <= channel <= max_channel:
         clear_output(wait=True)
-        # Render visualization for the selected layer and channel
         _ = render.render_vis(
             model,
             C((layer_name, channel)),
@@ -94,15 +155,19 @@ def interactive_visualization(
 
 def batch_visualization(
     model,
+    graph,
     layer_name,
-    channel_slider,
     scope="",
     channels_first=False,
 ):
     C = lambda neuron: objectives.channel(*neuron)
+    tensor = graph.get_tensor_by_name(f"{layer_name}:0")
+    tensor_shape = tensor.shape
+    # Check if the layer exists in the shape dictionary
+    max_channel = tensor_shape[-1] - 1
     try:
         image_channel = {}
-        for channel in tqdm(range(channel_slider.max)):
+        for channel in tqdm(range(max_channel)):
             images = render.render_vis(
                 model,
                 C((layer_name, channel)),

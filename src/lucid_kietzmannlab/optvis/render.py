@@ -177,7 +177,6 @@ def make_vis_T(
     objective_f = objectives.as_objective(objective_f)
     transform_f = make_transform_f(transforms)
     optimizer = make_optimizer(optimizer, [])
-    print(t_image.shape)
     if not channels_first:
         T = import_model(model, transform_f(t_image), t_image, scope=scope)
     else:
@@ -219,7 +218,7 @@ def make_print_objective_func(print_objectives, T):
 
 def make_t_image(param_f, channels_first=False):
     if param_f is None:
-        t_image = param.image(128, channels_first=channels_first)
+        t_image = param.image(224, channels_first=channels_first)
     elif callable(param_f):
         t_image = param_f()
     elif isinstance(param_f, tf.Tensor):

@@ -22,10 +22,18 @@ import numpy as np
 import tensorflow as tf
 import tf_slim as slim
 from cachetools.func import lru_cache
+from tqdm import tqdm
 
-from lucid_kietzmannlab.misc.io import loading
+import lucid_kietzmannlab.optvis.objectives as objectives
+import lucid_kietzmannlab.optvis.render as render
+from lucid_kietzmannlab.misc.io import loading, showing
 from lucid_kietzmannlab.modelzoo.conv_net import ConvNet
 from lucid_kietzmannlab.modelzoo.vision_base import Model
+
+tf.compat.v1.disable_eager_execution()
+trunc_normal = lambda stddev: tf.compat.v1.truncated_normal_initializer(
+    0.0, stddev
+)
 
 PATH_TEMPLATE = "gs://modelzoo/aligned-activations/{}/{}-{:05d}-of-01000.npy"
 PAGE_SIZE = 10000
@@ -268,7 +276,7 @@ def _get_layer_names_tensors(model: Model, scope=""):
         model.graph_def, {model.input_name: t_input}, name=scope
     )
     graph = tf.compat.v1.get_default_graph()
-    output_node_names_ecoset = [n.name for n in graph.as_graph_def().node]
+
     layer_shape_dict = {}
     for layer_name in layer_name_list:
         try:
@@ -443,7 +451,15 @@ class AlexNetCore(ConvNet):
 
 class AlexNetCodeOcean(Model):
 
-    def __init__(self, model_dir, random_seed=1, output_size=565, vis_layer=1):
+    def __init__(
+        self,
+        model_dir,
+        random_seed=1,
+        output_size=565,
+        vis_layer=1,
+        channel=0,
+        thresholds=(512,),
+    ):
 
         self.ckpt_path = os.path.join(model_dir, "model.ckpt_epoch89")
         self.model_dir = model_dir
@@ -451,14 +467,18 @@ class AlexNetCodeOcean(Model):
         self.image_shape = [224, 224, 3]
         self.dataset = "Ecoset"
         self._vis_layer = vis_layer
+        self._channel = channel
         self.is_BGR = False
         self.image_value_range = (-IMAGENET_MEAN_BGR, 255 - IMAGENET_MEAN_BGR)
-        self.input_name = "images_ph"
+        self.input_name = "image_ph"
         self.dropout_type = "bernoulli"
         self.random_seed = random_seed
+        self.thresholds = thresholds
         shape = [1, *self.image_shape]
         loaded_images = np.random.rand(*shape)
-        self._build_graph(loaded_images)
+        self._load_model_layers()
+        self.graph = self._build_graph(loaded_images)
+        self.layer_shape_dict = _get_layer_names_tensors(self)
 
     @property
     def vis_layer(self):
@@ -469,28 +489,92 @@ class AlexNetCodeOcean(Model):
         self._vis_layer = value
 
     @property
+    def channel(self):
+        return self._channel
+
+    @channel.setter
+    def channel(self, value):
+        self._channel = value
+
+    @property
     def graph_def(self):
         if not self._graph_def:
             self._graph_def = self.graph.as_graph_def()
         return self._graph_def
 
-    def visualize_layer(self):
+    def lucid_visualize_layer(self, batch=False):
         config = tf.compat.v1.ConfigProto()
         config.gpu_options.allow_growth = True
+        C = lambda neuron: objectives.channel(*neuron)
+        shape = [1, *self.image_shape]
+        loaded_images = np.random.rand(*shape)
+        self.graph = self._build_graph(loaded_images)
 
         with tf.compat.v1.Session(graph=self.graph, config=config) as sess:
-
-            activations = self.model.activations
-            activations_readout_before_softmax = (
-                self.model.readout
-            )  # batch_size x class
-            activations_readout_after_softmax = tf.nn.softmax(
-                activations_readout_before_softmax
+            self.activations = self.model.activations
+            self.activations_readout_before_softmax = self.model.readout
+            self.activations_readout_after_softmax = tf.nn.softmax(
+                self.activations_readout_before_softmax
             )
-
-            # restore the network
             saver = tf.compat.v1.train.Saver()
             saver.restore(sess, self.ckpt_path)
+
+            if isinstance(self._vis_layer, int):
+                layer_name = self.layers[self._vis_layer]["name"]
+            else:
+                layer_name = self._vis_layer
+            channel = self._channel
+
+            tensor = self.graph.get_tensor_by_name(f"{layer_name}:0")
+            tensor_shape = tensor.shape
+            max_channel = tensor_shape[-1] - 1
+            image_channel = {}
+            if batch:
+
+                for channel in tqdm(range(max_channel)):
+                    objective_f = C((layer_name, channel))
+                    T = render.make_vis_T(
+                        self, objective_f, scope=f"import_{channel}"
+                    )
+
+                    loss, vis_op, t_image = T("loss"), T("vis_op"), T("input")
+                    tf.compat.v1.global_variables_initializer().run()
+                    images = []
+
+                    try:
+                        for i in range(max(self.thresholds) + 1):
+                            loss_, _ = sess.run([loss, vis_op])
+                            if i in self.thresholds:
+                                vis = t_image.eval()
+                                images.append(vis)
+                        image_channel[channel] = images
+                    except KeyboardInterrupt:
+                        vis = t_image.eval()
+                        showing.show(np.hstack(vis))
+            else:
+                objective_f = C((layer_name, channel))
+                T = render.make_vis_T(
+                    self,
+                    objective_f,
+                )
+
+                loss, vis_op, t_image = T("loss"), T("vis_op"), T("input")
+                tf.compat.v1.global_variables_initializer().run()
+                images = []
+
+                try:
+                    for i in range(max(self.thresholds) + 1):
+                        loss_, _ = sess.run([loss, vis_op])
+                        if i in self.thresholds:
+                            vis = t_image.eval()
+                            images.append(vis)
+                            showing.show(np.hstack(vis))
+                    image_channel[channel] = images
+                except KeyboardInterrupt:
+                    vis = t_image.eval()
+                    showing.show(np.hstack(vis))
+
+            return image_channel
 
     def _build_graph(
         self,
@@ -499,23 +583,23 @@ class AlexNetCodeOcean(Model):
         output_size=565,
     ):
 
-        self.graph = tf.Graph()
-        with self.graph.as_default():
+        graph = tf.Graph()
+        with graph.as_default():
 
             if self.random_seed is not None:
                 tf.compat.v1.set_random_seed(self.random_seed)
 
             model_device = "/cpu:0"
             data_format = "NHWC"
-
+            print("loaded_images", loaded_images.shape)
             img_ph = tf.compat.v1.placeholder(
-                tf.float32, np.shape(loaded_images)[1:], self.input_name
+                tf.float32, np.shape(loaded_images), self.input_name
             )
             image_float32 = tf.image.convert_image_dtype(img_ph, tf.float32)
             image_rescaled = (image_float32 - 0.5) * 2
 
             image_tiled = tf.tile(
-                tf.expand_dims(image_rescaled, 0), [1, 1, 1, 1]
+                tf.expand_dims(image_rescaled, 0), [1, 1, 1, 1, 1]
             )
             self.model = AlexNetCore(
                 image_tiled,
@@ -530,6 +614,55 @@ class AlexNetCodeOcean(Model):
             self.model.net_mode = "test"
             self.model.is_training = False
             self.model.build_model()
+
+        return graph
+
+    def _load_model_layers(self):
+        self.layers = _layers_from_list_of_dicts(
+            self,
+            [
+                {
+                    "tags": ["conv"],
+                    "name": "alexnet_v2/conv1/Conv2D",
+                    "depth": 64,
+                },
+                {
+                    "tags": ["conv"],
+                    "name": "alexnet_v2/conv2/Conv2D",
+                    "depth": 192,
+                },
+                {
+                    "tags": ["conv"],
+                    "name": "alexnet_v2/conv3/Conv2D",
+                    "depth": 384,
+                },
+                {
+                    "tags": ["conv"],
+                    "name": "alexnet_v2/conv4/Conv2D",
+                    "depth": 384,
+                },
+                {
+                    "tags": ["conv"],
+                    "name": "alexnet_v2/conv5/Conv2D",
+                    "depth": 256,
+                },
+                {
+                    "tags": ["dense"],
+                    "name": "alexnet_v2/fc6/Conv2D",
+                    "depth": 4096,
+                },
+                {
+                    "tags": ["dense"],
+                    "name": "alexnet_v2/fc7/Conv2D",
+                    "depth": 4096,
+                },
+                {
+                    "tags": ["dense"],
+                    "name": "alexnet_v2/fc8/Conv2D",
+                    "depth": 565,
+                },
+            ],
+        )
 
 
 class AlexNetv2(Model):
@@ -624,11 +757,6 @@ class AlexNetv2(Model):
         )
 
 
-trunc_normal = lambda stddev: tf.compat.v1.truncated_normal_initializer(
-    0.0, stddev
-)
-
-
 def alexnet_v2_arg_scope(weight_decay=0.0005):
     with slim.arg_scope(
         [slim.conv2d, slim.fully_connected],
@@ -641,34 +769,83 @@ def alexnet_v2_arg_scope(weight_decay=0.0005):
                 return arg_sc
 
 
+def get_weights():
+    return [
+        v
+        for v in tf.compat.v1.get_collection(
+            tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES
+        )
+        if v.name.endswith("weights:0")
+    ]
+
+
 def alexnet_v2(
     inputs,
     num_classes=1000,
     is_training=True,
     dropout_keep_prob=0.5,
     spatial_squeeze=True,
-    reuse_variables=tf.compat.v1.AUTO_REUSE,
     scope="alexnet_v2",
     global_pool=False,
+    reuse_variables=True,
+    data_format="NHWC",
 ):
-
+    """AlexNet version 2.
+    Described in: http://arxiv.org/pdf/1404.5997v2.pdf
+    Parameters from:
+    github.com/akrizhevsky/cuda-convnet2/blob/master/layers/
+    layers-imagenet-1gpu.cfg
+    Note: All the fully_connected layers have been transformed to conv2d layers.
+          To use in classification mode, resize input to 224x224 or set
+          global_pool=True. To use in fully convolutional mode, set
+          spatial_squeeze to false.
+          The LRN layers have been removed and change the initializers from
+          random_normal_initializer to xavier_initializer.
+    Args:
+      inputs: a tensor of size [batch_size, height, width, channels].
+      num_classes: the number of predicted classes. If 0 or None, the logits layer
+      is omitted and the input features to the logits layer are returned instead.
+      is_training: whether or not the model is being trained.
+      dropout_keep_prob: the probability that activations are kept in the dropout
+        layers during training.
+      spatial_squeeze: whether or not should squeeze the spatial dimensions of the
+        logits. Useful to remove unnecessary dimensions for classification.
+      scope: Optional scope for the variables.
+      global_pool: Optional boolean flag. If True, the input to the classification
+        layer is avgpooled to size 1x1, for any input size. (This is not part
+        of the original AlexNet.)
+    Returns:
+      net: the output of the logits layer (if num_classes is a non-zero integer),
+        or the non-dropped-out input to the logits layer (if num_classes is 0
+        or None).
+      end_points: a dict of tensors with intermediate activations.
+    """
+    act = []
     with tf.compat.v1.variable_scope(
         scope, "alexnet_v2", [inputs], reuse=reuse_variables
     ) as sc:
         end_points_collection = sc.original_name_scope + "_end_points"
+        # Collect outputs for conv2d, fully_connected and max_pool2d.
         with slim.arg_scope(
             [slim.conv2d, slim.fully_connected, slim.max_pool2d],
-            outputs_collections=end_points_collection,
+            outputs_collections=[end_points_collection],
+            data_format=data_format,
         ):
+            inputs = inputs[0, :]
             net = slim.conv2d(
                 inputs, 64, [11, 11], 4, padding="VALID", scope="conv1"
             )
+            act.append(net)
             net = slim.max_pool2d(net, [3, 3], 2, scope="pool1")
             net = slim.conv2d(net, 192, [5, 5], scope="conv2")
+            act.append(net)
             net = slim.max_pool2d(net, [3, 3], 2, scope="pool2")
             net = slim.conv2d(net, 384, [3, 3], scope="conv3")
+            act.append(net)
             net = slim.conv2d(net, 384, [3, 3], scope="conv4")
+            act.append(net)
             net = slim.conv2d(net, 256, [3, 3], scope="conv5")
+            act.append(net)
             net = slim.max_pool2d(net, [3, 3], 2, scope="pool5")
 
             # Use conv2d instead of fully_connected layers.
@@ -686,7 +863,9 @@ def alexnet_v2(
                     is_training=is_training,
                     scope="dropout6",
                 )
+                act.append(net)
                 net = slim.conv2d(net, 4096, [1, 1], scope="fc7")
+                act.append(net)
                 # Convert end_points_collection into a end_point dict.
                 end_points = slim.utils.convert_collection_to_dict(
                     end_points_collection
@@ -715,10 +894,16 @@ def alexnet_v2(
                         biases_initializer=tf.zeros_initializer(),
                         scope="fc8",
                     )
-                if spatial_squeeze:
-                    net = tf.squeeze(net, [1, 2], name="fc8/squeezed")
+                    if spatial_squeeze:
+                        squeeze_dims = (
+                            [2, 3] if data_format == "NCHW" else [1, 2]
+                        )
+                        net = tf.squeeze(
+                            net, squeeze_dims, name="fc8/squeezed"
+                        )
+                    readout = net
                     end_points[sc.name + "/fc8"] = net
-    return net, end_points
+            return readout, act, get_weights()
 
 
 alexnet_v2.default_image_size = 224

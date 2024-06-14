@@ -163,7 +163,6 @@ def get_activations_iter(
         shape = [None, 3, None, None]
     with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
         t_img = tf.compat.v1.placeholder("float32", shape)
-        print("being here", t_img.shape)
         T = model.import_graph(t_img)
         t_layer = T(layer)
 
