@@ -16,7 +16,9 @@ This [KietzmannLab] package was generated with [Cookiecutter] using [@KietzmannL
 
 Starting from random noise, we optimize an image to activate a particular neuron. A neuron is a certain layer of the trained network at a certain channel. The optimization function used is the negative of the spatial activation map at that layer and channel and after iterating for 512 steps a random noise image is transformed to the features that maximally activate that particular neuron.
 
-Using this approach we can convincingly show that earlier neural network layers maximally activate Gabor like features while the later layers are more feature rich and are maximally activated with higher level features.
+Using this approach we can convincingly show that earlier neural network layers maximally activate Gabor like features while the later layers are more feature rich for example human faces, multiple objects that were a part of the training dataset.
+
+By visualizing different channles of a certain layer we show the diversity captured by the trained model.
 
 ## Installation
 
