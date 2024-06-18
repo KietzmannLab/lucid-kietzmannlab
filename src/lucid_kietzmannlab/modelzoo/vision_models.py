@@ -31,6 +31,7 @@ from lucid_kietzmannlab.modelzoo.conv_net import ConvNet
 from lucid_kietzmannlab.modelzoo.vision_base import Model
 
 tf.compat.v1.disable_eager_execution()
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 trunc_normal = lambda stddev: tf.compat.v1.truncated_normal_initializer(
     0.0, stddev
 )
@@ -594,7 +595,6 @@ class AlexNetCodeOcean(Model):
 
             model_device = "/cpu:0"
             data_format = "NHWC"
-            print("loaded_images", loaded_images.shape)
             img_ph = tf.compat.v1.placeholder(
                 tf.float32, np.shape(loaded_images), self.input_name
             )

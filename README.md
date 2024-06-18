@@ -12,7 +12,11 @@ Visualization of Interaction Between Neurons using Lucid
 
 This [KietzmannLab] package was generated with [Cookiecutter] using [@KietzmannLab]'s [cookiecutter-template] template.
 
+## Algorithm
 
+Starting from random noise, we optimize an image to activate a particular neuron. A neuron is a certain layer of the trained network at a certain channel. The optimization function used is the negative of the spatial activation map at that layer and channel and after iterating for 512 steps a random noise image is transformed to the features that maximally activate that particular neuron.
+
+Using this approach we can convincingly show that earlier neural network layers maximally activate Gabor like features while the later layers are more feature rich and are maximally activated with higher level features.
 
 ## Installation
 
