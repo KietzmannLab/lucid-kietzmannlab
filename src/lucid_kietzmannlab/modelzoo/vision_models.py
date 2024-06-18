@@ -547,6 +547,7 @@ class AlexNetCodeOcean(Model):
 
                     try:
                         for i in range(max(self.thresholds) + 1):
+
                             loss_, _ = sess.run([loss, vis_op])
                             if i in self.thresholds:
                                 vis = t_image.eval()
@@ -555,6 +556,8 @@ class AlexNetCodeOcean(Model):
                     except KeyboardInterrupt:
                         vis = t_image.eval()
                         showing.show(np.hstack(vis))
+                    except Exception:
+                        pass
             else:
                 objective_f = C((layer_name, channel))
                 T = render.make_vis_T(

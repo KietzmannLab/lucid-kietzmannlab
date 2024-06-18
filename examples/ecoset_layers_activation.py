@@ -21,7 +21,11 @@ def _set_seeds(seed=42):
 
 
 def save_layer_channel_visualization(
-    model: models.AlexNetCodeOcean, save_dir: str, random_seed: int = 1
+    model: models.AlexNetCodeOcean,
+    save_dir: str,
+    random_seed: int = 1,
+    channel_start: int = 0,
+    channel_end: int = -1,
 ):
 
     _set_seeds(random_seed)
@@ -30,27 +34,38 @@ def save_layer_channel_visualization(
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     for index, layer_name in enumerate(tqdm(layer_shape_dict.keys())):
-        model.vis_layer = layer_name
-        image_channel = model.lucid_visualize_layer(batch=True)
-        layer_dir = os.path.join(save_dir, f"layer_{index}")
-        if not os.path.exists(layer_dir):
-            os.makedirs(layer_dir)
-        for channel, images in image_channel.items():
-            image = images[0][0, :]
-            clean_layer_name = layer_name.replace("/", "_")
-            save_name = os.path.join(
-                layer_dir, f"layer_{clean_layer_name}_channel_{channel}.png"
+        if index > 0:
+            model.vis_layer = layer_name
+            image_channel = model.lucid_visualize_layer(
+                batch=True, channel_start=channel_start, chanel_end=channel_end
             )
-            plt.imsave(save_name, image)
-            plt.close()
+            layer_dir = os.path.join(save_dir, f"layer_{index}")
+            if not os.path.exists(layer_dir):
+                os.makedirs(layer_dir)
+            for channel, images in image_channel.items():
+                if len(images) > 0:
+                    image = images[0][0, :]
+                    clean_layer_name = layer_name.replace("/", "_")
+                    save_name = os.path.join(
+                        layer_dir,
+                        f"layer_{clean_layer_name}_channel_{channel}.png",
+                    )
+                    plt.imsave(save_name, image)
+                    plt.close()
 
 
 if __name__ == "__main__":
 
-    model_dir = "/Users/vkapoor/Downloads/models/AlexNet/training_seed_01"
-    save_dir = "/Users/vkapoor/Downloads/models/AlexNet/"
+    model_dir = (
+        "/Users/vkapoor/Downloads/codeocean/models/AlexNet/training_seed_01"
+    )
+    save_dir = "/Users/vkapoor/Downloads/codeocean/models/AlexNet/"
     random_seed = 1
+    channel_start = 0
+    channel_end = -1
     model = models.AlexNetCodeOcean(
         model_dir=model_dir, random_seed=random_seed
     )
-    save_layer_channel_visualization(model, save_dir, random_seed)
+    save_layer_channel_visualization(
+        model, save_dir, random_seed, channel_start, channel_end
+    )
