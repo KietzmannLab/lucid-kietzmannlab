@@ -34,7 +34,7 @@ def save_layer_channel_visualization(
         image_channel = model.lucid_visualize_layer(batch=True)
         layer_dir = os.path.join(save_dir, f"layer_{index}")
         if not os.path.exists(layer_dir):
-            os.makedirs()
+            os.makedirs(layer_dir)
         for channel, images in image_channel.items():
             image = images[0][0, :]
             clean_layer_name = layer_name.replace("/", "_")

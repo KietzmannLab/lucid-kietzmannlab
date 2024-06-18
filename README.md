@@ -16,9 +16,9 @@ This [KietzmannLab] package was generated with [Cookiecutter] using [@KietzmannL
 
 Starting from random noise, we optimize an image to activate a particular neuron. A neuron is a certain layer of the trained network at a certain channel. The optimization function used is the negative of the spatial activation map at that layer and channel and after iterating for 512 steps a random noise image is transformed to the features that maximally activate that particular neuron.
 
-Using this approach we can convincingly show that earlier neural network layers maximally activate Gabor like features while the later layers are more feature rich for example human faces, multiple objects that were a part of the training dataset.
+Using this approach we can convincingly show that earlier neural network layers maximally activate Gabor like features (edges at different orientation and scale) while the later layers are more feature rich containing object level features.
 
-By visualizing different channles of a certain layer we show the diversity captured by the trained model.
+By visualizing different channles of a certain layer we show the diversity captured by the trained model. In this repository we use Alexnet models [trained on ecoset](https://codeocean.com/capsule/9570390/tree/v1). In this repository at this folder '/data/models/AlexNet/ecoset_training_seeds_01_to_1/' you will find 10 differnt models trained using different seed in tensorflow 1.x framework. Using any of those model seeds the maximal activations of different layers of AlexNet model can be seen [interactively](examples/interactive_layer_visualization.ipynb) or by iterating over all the layers and saving the results as png files for each layer and channel using this [script](examples/ecoset_layers_activation.py). Prior to running the notebook or the script please install the package in your virtual environment by following the instructions below.
 
 ## Installation
 
