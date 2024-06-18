@@ -53,4 +53,4 @@ if __name__ == "__main__":
     model = models.AlexNetCodeOcean(
         model_dir=model_dir, random_seed=random_seed
     )
-    save_layer_channel_visualization(model)
+    save_layer_channel_visualization(model, save_dir)
