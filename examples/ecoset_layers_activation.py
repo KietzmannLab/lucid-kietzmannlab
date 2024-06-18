@@ -21,10 +21,10 @@ def _set_seeds(seed=42):
 
 
 def save_layer_channel_visualization(
-    model: models.AlexNetCodeOcean, save_dir: str, seed: int = 42
+    model: models.AlexNetCodeOcean, save_dir: str, random_seed: int = 1
 ):
 
-    _set_seeds(seed)
+    _set_seeds(random_seed)
     layer_shape_dict = model.layer_shape_dict
     save_dir = os.path.join(save_dir, "layer_channel_visualizations")
     if not os.path.exists(save_dir):
@@ -53,4 +53,4 @@ if __name__ == "__main__":
     model = models.AlexNetCodeOcean(
         model_dir=model_dir, random_seed=random_seed
     )
-    save_layer_channel_visualization(model, save_dir)
+    save_layer_channel_visualization(model, save_dir, random_seed)
