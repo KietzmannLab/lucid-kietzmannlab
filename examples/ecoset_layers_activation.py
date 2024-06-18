@@ -21,12 +21,12 @@ def _set_seeds(seed=42):
 
 
 def save_layer_channel_visualization(
-    model: models.AlexNetCodeOcean, seed: int = 42
+    model: models.AlexNetCodeOcean, save_dir: str, seed: int = 42
 ):
 
     _set_seeds(seed)
     layer_shape_dict = model.layer_shape_dict
-    save_dir = "layer_channel_visualizations"
+    save_dir = os.path.join(save_dir, "layer_channel_visualizations")
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     for index, layer_name in enumerate(tqdm(layer_shape_dict.keys())):
@@ -34,7 +34,7 @@ def save_layer_channel_visualization(
         image_channel = model.lucid_visualize_layer(batch=True)
         layer_dir = os.path.join(save_dir, f"layer_{index}")
         if not os.path.exists(layer_dir):
-            os.makedirs(layer_dir)
+            os.makedirs()
         for channel, images in image_channel.items():
             image = images[0][0, :]
             clean_layer_name = layer_name.replace("/", "_")
@@ -48,6 +48,7 @@ def save_layer_channel_visualization(
 if __name__ == "__main__":
 
     model_dir = "/Users/vkapoor/Downloads/models/AlexNet/training_seed_01"
+    save_dir = "/Users/vkapoor/Downloads/models/AlexNet/"
     random_seed = 1
     model = models.AlexNetCodeOcean(
         model_dir=model_dir, random_seed=random_seed
