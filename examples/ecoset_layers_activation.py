@@ -35,6 +35,7 @@ def save_layer_channel_visualization(
     random_seed: int = 1,
     channel_start: int = 0,
     channel_end: int = -1,
+    max_workers: int = 4,
 ):
     _set_seeds(random_seed)
     layer_shape_dict = model.layer_shape_dict
@@ -56,7 +57,7 @@ def save_layer_channel_visualization(
 
             clean_layer_name = layer_name.replace("/", "_")
 
-            with ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 futures = []
                 for channel, images in image_channel.items():
                     if len(images) > 0:
@@ -82,9 +83,10 @@ if __name__ == "__main__":
     random_seed = 1
     channel_start = 0
     channel_end = -1
+    max_workers = 40
     model = models.AlexNetCodeOcean(
         model_dir=model_dir, random_seed=random_seed
     )
     save_layer_channel_visualization(
-        model, save_dir, random_seed, channel_start, channel_end
+        model, save_dir, random_seed, channel_start, channel_end, max_workers
     )
