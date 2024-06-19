@@ -68,7 +68,10 @@ def register_to_random_name(grad_f):
     Returns:
       String that gradient function was registered to.
     """
-    grad_f_name = grad_f.__name__ + "_" + hex(np.random.randint(0, 1e10))[2:]
+    max_int = 2**31 - 1
+    grad_f_name = (
+        grad_f.__name__ + "_" + hex(np.random.randint(0, max_int))[2:]
+    )
     tf.RegisterGradient(grad_f_name)(grad_f)
     return grad_f_name
 
