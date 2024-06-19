@@ -37,7 +37,9 @@ def save_layer_channel_visualization(
         if index > 0:
             model.vis_layer = layer_name
             image_channel = model.lucid_visualize_layer(
-                batch=True, channel_start=channel_start, chanel_end=channel_end
+                batch=True,
+                channel_start=channel_start,
+                channel_end=channel_end,
             )
             layer_dir = os.path.join(save_dir, f"layer_{index}")
             if not os.path.exists(layer_dir):
