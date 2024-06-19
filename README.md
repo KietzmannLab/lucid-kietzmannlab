@@ -25,6 +25,13 @@ By visualizing different channles of a certain layer we show the diversity captu
 You can install `lucid-kietzmannlab` via [pip]:
 
     pip install git+https://github.com/KietzmannLab/lucid-kietzmannlab.git
+    
+It is recommended to do the installation in a virtual conda environment, if you do not have a conda environment you can create one using:
+
+            conda create -n conda_env_name python=3.12
+            
+ Then activate the environment and install the package using pip as mentioned above.
+
 
 
 ## Contributing
