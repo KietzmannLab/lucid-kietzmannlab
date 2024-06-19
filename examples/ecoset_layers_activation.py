@@ -43,30 +43,35 @@ def save_layer_channel_visualization(
     save_dir = os.path.join(save_dir, "layer_channel_visualizations")
     os.makedirs(save_dir, exist_ok=True)
 
-    save_infos = []
-
-    for index, layer_name in enumerate(tqdm(layer_shape_dict.keys())):
-        if index > 0:
-            model.vis_layer = layer_name
-            image_channel = model.lucid_visualize_layer(
-                batch=True,
-                channel_start=channel_start,
-                channel_end=channel_end,
-            )
-            layer_dir = os.path.join(save_dir, f"layer_{index + 1}")
-            os.makedirs(layer_dir, exist_ok=True)
-
-            clean_layer_name = layer_name.replace("/", "_")
-
-            for channel, images in image_channel.items():
-                if len(images) > 0:
-                    image = images[0][0, :]
-                    save_infos.append(
-                        (layer_dir, clean_layer_name, channel, image)
-                    )
-
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        list(tqdm(executor.map(save_image, save_infos), total=len(save_infos)))
+        for index, layer_name in enumerate(tqdm(layer_shape_dict.keys())):
+            if index > 0:
+                model.vis_layer = layer_name
+                image_channel = model.lucid_visualize_layer(
+                    batch=True,
+                    channel_start=channel_start,
+                    channel_end=channel_end,
+                )
+                layer_dir = os.path.join(save_dir, f"layer_{index + 1}")
+                os.makedirs(layer_dir, exist_ok=True)
+
+                clean_layer_name = layer_name.replace("/", "_")
+
+                save_infos = []
+                for channel, images in image_channel.items():
+                    if len(images) > 0:
+                        image = images[0][0, :]
+                        save_infos.append(
+                            (layer_dir, clean_layer_name, channel, image)
+                        )
+                # Save images for the current layer
+                list(
+                    tqdm(
+                        executor.map(save_image, save_infos),
+                        total=len(save_infos),
+                        desc=f"Saving {layer_name}",
+                    )
+                )
 
 
 if __name__ == "__main__":
