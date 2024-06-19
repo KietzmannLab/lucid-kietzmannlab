@@ -76,10 +76,8 @@ def save_layer_channel_visualization(
 
 
 if __name__ == "__main__":
-    model_dir = (
-        "/Users/vkapoor/Downloads/codeocean/models/AlexNet/training_seed_01"
-    )
-    save_dir = "/Users/vkapoor/Downloads/codeocean/models/AlexNet/"
+    model_dir = "/share/klab/vkapoor/AlexNet/training_seed_01/"
+    save_dir = "/share/klab/vkapoor/AlexNet/"
     random_seed = 1
     channel_start = 0
     channel_end = -1
