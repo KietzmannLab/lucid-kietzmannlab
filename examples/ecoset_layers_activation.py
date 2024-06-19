@@ -70,12 +70,14 @@ def save_layer_channel_visualization(
 
 
 if __name__ == "__main__":
-    model_dir = "/share/klab/vkapoor/AlexNet/training_seed_01/"
-    save_dir = "/share/klab/vkapoor/AlexNet/"
+    model_dir = (
+        "/Users/vkapoor/Downloads/hpc/vkapoor/AlexNet/training_seed_01/"
+    )
+    save_dir = "/Users/vkapoor/Downloads/hpc/vkapoor/AlexNet/"
     random_seed = 1
     channel_start = 0
     channel_end = -1
-    max_workers = 40
+    max_workers = 8
     model = models.AlexNetCodeOcean(
         model_dir=model_dir, random_seed=random_seed
     )
