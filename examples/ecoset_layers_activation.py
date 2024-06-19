@@ -21,7 +21,8 @@ def _set_seeds(seed=42):
     random.seed(seed)
 
 
-def save_image(layer_dir, clean_layer_name, channel, image):
+def save_image(save_info):
+    layer_dir, clean_layer_name, channel, image = save_info
     save_name = os.path.join(
         layer_dir, f"layer_{clean_layer_name}_channel_{channel}.png"
     )
@@ -40,8 +41,9 @@ def save_layer_channel_visualization(
     _set_seeds(random_seed)
     layer_shape_dict = model.layer_shape_dict
     save_dir = os.path.join(save_dir, "layer_channel_visualizations")
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
+    os.makedirs(save_dir, exist_ok=True)
+
+    save_infos = []
 
     for index, layer_name in enumerate(tqdm(layer_shape_dict.keys())):
         if index > 0:
@@ -52,27 +54,19 @@ def save_layer_channel_visualization(
                 channel_end=channel_end,
             )
             layer_dir = os.path.join(save_dir, f"layer_{index + 1}")
-            if not os.path.exists(layer_dir):
-                os.makedirs(layer_dir)
+            os.makedirs(layer_dir, exist_ok=True)
 
             clean_layer_name = layer_name.replace("/", "_")
 
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                futures = []
-                for channel, images in image_channel.items():
-                    if len(images) > 0:
-                        image = images[0][0, :]
-                        futures.append(
-                            executor.submit(
-                                save_image,
-                                layer_dir,
-                                clean_layer_name,
-                                channel,
-                                image,
-                            )
-                        )
-                for future in futures:
-                    future.result()
+            for channel, images in image_channel.items():
+                if len(images) > 0:
+                    image = images[0][0, :]
+                    save_infos.append(
+                        (layer_dir, clean_layer_name, channel, image)
+                    )
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        list(tqdm(executor.map(save_image, save_infos), total=len(save_infos)))
 
 
 if __name__ == "__main__":
